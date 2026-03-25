@@ -21,6 +21,8 @@ tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-pn
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
+log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }

@@ -26,9 +26,5 @@
       "minimumSystemVersion": "10.15"
     }
   },
-  "plugins": {
-    "autostart": {
-      "macOSLaunchAgent": true
-    }
-  }
+  "plugins": {}
 }

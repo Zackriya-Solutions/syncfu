@@ -16,6 +16,7 @@ export function useNotifications() {
       const unAdd = await tauriEvent.listen<NotificationPayload>(
         "notification:add",
         (ev) => {
+          console.log("[syncfu] Received notification:add", ev.payload);
           add(ev.payload as NotificationPayload);
         }
       );

@@ -6,6 +6,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
@@ -96,6 +97,7 @@ pub fn build_router(state: ServerState) -> Router {
 pub async fn start_server(state: ServerState, port: u16) -> Result<(), std::io::Error> {
     let app = build_router(state);
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
+    info!("HTTP server listening on 127.0.0.1:{port}");
     axum::serve(listener, app).await
 }
 
@@ -103,6 +105,7 @@ async fn handle_notify(
     State(state): State<ServerState>,
     Json(req): Json<NotifyRequest>,
 ) -> (StatusCode, Json<NotifyResponse>) {
+    let req_sender = req.sender.clone();
     let payload = NotificationPayload {
         id: uuid::Uuid::new_v4().to_string(),
         sender: req.sender,
@@ -124,7 +127,13 @@ async fn handle_notify(
 
     // Emit to frontend if app handle is available
     if let Some(ref app) = state.app_handle {
-        let _ = tauri::Emitter::emit(app, "notification:add", &payload);
+        debug!("Emitting notification:add for id={id}");
+        match tauri::Emitter::emit(app, "notification:add", &payload) {
+            Ok(()) => info!("Notification emitted: id={id} sender={}", req_sender),
+            Err(e) => error!("Failed to emit notification:add: {e}"),
+        }
+    } else {
+        warn!("No app_handle — cannot emit notification event");
     }
 
     (StatusCode::CREATED, Json(NotifyResponse { id }))
@@ -135,6 +144,7 @@ async fn handle_update(
     axum::extract::Path(id): axum::extract::Path<String>,
     Json(req): Json<UpdateRequest>,
 ) -> StatusCode {
+    debug!("Update request for id={id}");
     let update = NotificationUpdate {
         body: req.body,
         progress: req.progress,
@@ -150,8 +160,10 @@ async fn handle_update(
                 &serde_json::json!({ "id": id, "update": update }),
             );
         }
+        info!("Notification updated: id={id}");
         StatusCode::OK
     } else {
+        warn!("Update failed — notification not found: id={id}");
         StatusCode::NOT_FOUND
     }
 }
@@ -160,14 +172,17 @@ async fn handle_dismiss(
     State(state): State<ServerState>,
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> StatusCode {
+    debug!("Dismiss request for id={id}");
     let dismissed = state.manager.dismiss(&id).await;
 
     if dismissed.is_some() {
         if let Some(ref app) = state.app_handle {
             let _ = tauri::Emitter::emit(app, "notification:dismiss", &id);
         }
+        info!("Notification dismissed: id={id}");
         StatusCode::OK
     } else {
+        warn!("Dismiss failed — notification not found: id={id}");
         StatusCode::NOT_FOUND
     }
 }
@@ -182,6 +197,7 @@ async fn handle_dismiss_all(
         let _ = tauri::Emitter::emit(app, "notification:dismiss-all", &count);
     }
 
+    info!("All notifications dismissed: count={count}");
     Json(DismissAllResponse { dismissed: count })
 }
 

@@ -4,10 +4,18 @@ pub mod tray;
 
 use std::sync::Arc;
 
+use log::{error, info};
 use notification::manager::NotificationManager;
 use notification::types::{NotificationPayload, NotificationUpdate, Priority, Timeout};
 use server::http::ServerState;
 use tauri::{Emitter, Manager};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
+
+#[cfg(debug_assertions)]
+const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
+
+#[cfg(not(debug_assertions))]
+const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
 #[tauri::command]
 async fn notify(
@@ -111,7 +119,32 @@ async fn test_notify(
 pub fn run() {
     let manager = NotificationManager::new();
 
+    #[cfg(debug_assertions)]
+    let log_targets = vec![
+        Target::new(TargetKind::LogDir {
+            file_name: Some("syncfu-dev".into()),
+        }),
+        Target::new(TargetKind::Stdout),
+        Target::new(TargetKind::Webview),
+    ];
+
+    #[cfg(not(debug_assertions))]
+    let log_targets = vec![
+        Target::new(TargetKind::LogDir {
+            file_name: Some("syncfu".into()),
+        }),
+        Target::new(TargetKind::Stdout),
+    ];
+
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets(log_targets)
+                .level(LOG_LEVEL)
+                .max_file_size(5 * 1024 * 1024) // 5 MB
+                .rotation_strategy(RotationStrategy::KeepAll)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -128,9 +161,12 @@ pub fn run() {
             test_notify,
         ])
         .setup(|app| {
+            info!("syncfu starting up");
+
             // Set up system tray
             tray::menu::setup_tray(app.handle())
                 .expect("failed to set up system tray");
+            info!("System tray initialized");
 
             // Get primary monitor dimensions for overlay sizing
             let (width, height) = match app.primary_monitor() {
@@ -140,6 +176,8 @@ pub fn run() {
                 }
                 _ => (1920.0, 1080.0), // fallback
             };
+
+            info!("Creating overlay window: {width}x{height}");
 
             // Create overlay window — fullscreen, transparent, always on top
             let _overlay = tauri::WebviewWindowBuilder::new(
@@ -161,15 +199,16 @@ pub fn run() {
             .build()
             .expect("failed to create overlay window");
 
-            // Start HTTP server on port 9876
+            // Start HTTP server on port 9868
+            info!("Starting HTTP server on port 9868");
             let manager = app.state::<Arc<NotificationManager>>().inner().clone();
             let server_state = ServerState {
                 manager,
                 app_handle: Some(app.handle().clone()),
             };
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = server::http::start_server(server_state, 9876).await {
-                    eprintln!("HTTP server error: {e}");
+                if let Err(e) = server::http::start_server(server_state, 9868).await {
+                    error!("HTTP server failed: {e}");
                 }
             });
 
