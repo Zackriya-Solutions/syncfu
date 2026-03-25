@@ -57,9 +57,9 @@ def main():
 
     if mode == "--all":
         print("Sending one of each priority:")
-        send({"sender": "test", "title": "Low Priority", "body": "This is fine", "priority": "low", "icon": "check-circle"})
+        send({"sender": "test", "title": "Low Priority", "body": "This is fine", "priority": "low", "icon": "circle-check"})
         send({"sender": "test", "title": "Normal Priority", "body": "Business as usual", "priority": "normal", "icon": "info"})
-        send({"sender": "test", "title": "High Priority", "body": "Needs attention soon", "priority": "high", "icon": "alert-triangle"})
+        send({"sender": "test", "title": "High Priority", "body": "Needs attention soon", "priority": "high", "icon": "triangle-alert"})
         send({"sender": "test", "title": "Critical Alert", "body": "Disk usage at 95%!", "priority": "critical", "icon": "flame"})
 
     elif mode == "--burst":
@@ -181,10 +181,10 @@ def main():
 
         # Purple/brand theme with custom buttons
         send({
-            "sender": "figma",
+            "sender": "pen-tool",
             "title": "Design Review Ready",
             "body": "Landing page v3 needs your feedback",
-            "icon": "figma",
+            "icon": "pen-tool",
             "priority": "high",
             "style": {
                 "accentColor": "#a855f7",
@@ -239,7 +239,7 @@ def main():
 
     elif mode == "--fonts":
         print("Sending notifications with custom Google Fonts:")
-        send({"sender": "design", "title": "New Mockup Ready", "body": "Landing page v3 uploaded to Figma", "icon": "figma", "font": "Space Grotesk"})
+        send({"sender": "design", "title": "New Mockup Ready", "body": "Landing page v3 uploaded to Figma", "icon": "pen-tool", "font": "Space Grotesk"})
         send({"sender": "terminal", "title": "Build Complete", "body": "All 247 tests passed", "icon": "terminal", "font": "JetBrains Mono", "priority": "low"})
         send({"sender": "editorial", "title": "Article Published", "body": "How We Scaled to 1M Users", "icon": "newspaper", "font": "Playfair Display"})
         send({"sender": "playful", "title": "Achievement Unlocked", "body": "You shipped 10 features this week!", "icon": "trophy", "font": "Nunito", "priority": "low"})

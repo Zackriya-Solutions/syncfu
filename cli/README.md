@@ -25,7 +25,7 @@ That's it. Body is the positional argument. Sender defaults to `$USER`, priority
 syncfu send "Backup complete"
 
 # With title, priority, icon
-syncfu send -t "Build Passed" -p high -i check-circle "All tests green"
+syncfu send -t "Build Passed" -p high -i circle-check "All tests green"
 
 # Action buttons (repeatable)
 syncfu send -t "PR #42" \

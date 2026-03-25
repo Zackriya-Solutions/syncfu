@@ -13,7 +13,7 @@ syncfu send "All 47 tests passing."
 Need more? Add flags.
 
 ```bash
-syncfu send -t "Loop complete" -p high -i check-circle \
+syncfu send -t "Loop complete" -p high -i circle-check \
   --action "open:Open PR:primary" --action "skip:Skip:secondary" \
   "All 47 tests passing."
 ```
@@ -29,9 +29,6 @@ If you run AI agents, autonomous coding loops, or long-running background tasks 
 OS notifications are unreliable for this. They get swallowed by Focus Mode, grouped into oblivion, or silently dropped. You need a notification layer that respects your attention — one that puts information on your screen when it matters, with action buttons so you can respond without context-switching.
 
 syncfu is that layer.
-
-> *"I have ADHD. I don't go back and read stuff. If the information doesn't come to me, it doesn't exist."*
-> — the reason this project exists
 
 ---
 
@@ -174,7 +171,7 @@ Running 5 parallel agents? Each one reports status to syncfu with its own sender
 GitHub Actions, GitLab CI, Jenkins — POST to syncfu when builds finish. Include pass/fail status, duration, coverage delta, and a "Open PR" action button.
 
 ```bash
-syncfu send -t "Build passed" -s github-actions -i check-circle \
+syncfu send -t "Build passed" -s github-actions -i circle-check \
   --action "open_pr:Open PR:primary" --sound success --group ci-builds \
   "main built in 3m 42s — 142 tests passed, coverage 87% (+2.1%)"
 ```
@@ -197,8 +194,8 @@ Long-running migrations report progress: *"Migrating users table — 2.4M of 8.1
 
 ```bash
 # Notify on test pass or fail
-cargo test && syncfu send -t "Tests passed" -p low -i check-circle "All green" \
-  || syncfu send -t "Tests failed" -p critical -i x-circle "Check terminal"
+cargo test && syncfu send -t "Tests passed" -p low -i circle-check "All green" \
+  || syncfu send -t "Tests failed" -p critical -i circle-x "Check terminal"
 ```
 
 **Long compilation finished**

@@ -34,5 +34,14 @@ function resolveIcon(name: string) {
   if (pascal in icons) {
     return icons[pascal as keyof typeof icons];
   }
+  // Lucide v1.x renamed icons with reversed word order
+  // e.g. "check-circle" → "circle-check", "alert-triangle" → "triangle-alert"
+  const parts = name.split(/[-_\s]+/);
+  if (parts.length === 2) {
+    const reversed = toPascalCase(`${parts[1]}-${parts[0]}`);
+    if (reversed in icons) {
+      return icons[reversed as keyof typeof icons];
+    }
+  }
   return null;
 }
