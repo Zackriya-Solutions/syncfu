@@ -159,6 +159,7 @@ async fn test_notify(
         theme: None,
         sound: None,
         callback_url: None,
+        style: None,
         created_at: chrono::Utc::now(),
     };
     let id = manager.add(payload.clone()).await;

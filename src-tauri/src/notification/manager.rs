@@ -126,6 +126,7 @@ mod tests {
             theme: None,
             sound: None,
             callback_url: None,
+            style: None,
             created_at: chrono::Utc::now(),
         }
     }

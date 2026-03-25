@@ -12,7 +12,8 @@ use tower_http::cors::CorsLayer;
 
 use crate::notification::manager::NotificationManager;
 use crate::notification::types::{
-    Action, NotificationPayload, NotificationUpdate, Priority, ProgressInfo, Timeout,
+    Action, NotificationPayload, NotificationUpdate, Priority, ProgressInfo, StyleOverrides,
+    Timeout,
 };
 use crate::server::webhook::{self, WebhookPayload, WebhookResult};
 
@@ -47,6 +48,8 @@ pub struct NotifyRequest {
     pub sound: Option<String>,
     #[serde(default)]
     pub callback_url: Option<String>,
+    #[serde(default)]
+    pub style: Option<StyleOverrides>,
 }
 
 fn default_priority() -> Priority {
@@ -128,6 +131,7 @@ async fn handle_notify(
         theme: req.theme,
         sound: req.sound,
         callback_url: req.callback_url,
+        style: req.style,
         created_at: chrono::Utc::now(),
     };
 
@@ -401,6 +405,7 @@ mod tests {
             theme: None,
             sound: None,
             callback_url: None,
+            style: None,
             created_at: chrono::Utc::now(),
         };
         state.manager.add(payload).await;
@@ -458,6 +463,7 @@ mod tests {
                 theme: None,
                 sound: None,
                 callback_url: None,
+                style: None,
                 created_at: chrono::Utc::now(),
             };
             state.manager.add(payload).await;
@@ -503,6 +509,7 @@ mod tests {
             theme: None,
             sound: None,
             callback_url: None,
+            style: None,
             created_at: chrono::Utc::now(),
         };
         state.manager.add(payload).await;
@@ -575,6 +582,7 @@ mod tests {
             theme: None,
             sound: None,
             callback_url: None,
+            style: None,
             created_at: chrono::Utc::now(),
         };
         state.manager.add(payload).await;
@@ -618,6 +626,7 @@ mod tests {
             theme: None,
             sound: None,
             callback_url: None,
+            style: None,
             created_at: chrono::Utc::now(),
         };
         state.manager.add(payload).await;
@@ -656,12 +665,17 @@ mod tests {
                 id: "approve".to_string(),
                 label: "Approve".to_string(),
                 style: crate::notification::types::ActionStyle::Primary,
+                icon: None,
+                bg: None,
+                color: None,
+                border_color: None,
             }],
             progress: None,
             group: None,
             theme: None,
             sound: None,
             callback_url: None,
+            style: None,
             created_at: chrono::Utc::now(),
         };
         state.manager.add(payload).await;

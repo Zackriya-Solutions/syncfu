@@ -11,6 +11,7 @@ Usage:
     python3 scripts/fire.py --icons          # send notifications with various icons
     python3 scripts/fire.py --fonts          # send notifications with custom Google Fonts
     python3 scripts/fire.py --webhook        # send notification with callback_url (starts listener)
+    python3 scripts/fire.py --styled         # send notifications with custom style overrides
 """
 
 import json
@@ -155,6 +156,86 @@ def main():
             server.shutdown()
             print("\n  Listener stopped.")
         return
+
+    elif mode == "--styled":
+        print("Sending styled notifications with custom colors:")
+
+        # Green deploy theme
+        send({
+            "sender": "deploy",
+            "title": "Deploy Complete",
+            "body": "v2.1.0 is live in production",
+            "icon": "rocket",
+            "priority": "low",
+            "style": {
+                "accentColor": "#22c55e",
+                "cardBg": "rgba(10, 40, 20, 0.96)",
+                "iconColor": "#4ade80",
+                "iconBg": "rgba(34, 197, 94, 0.15)",
+                "titleColor": "#bbf7d0",
+                "bodyColor": "#86efac",
+                "progressColor": "#22c55e",
+            },
+            "progress": {"value": 1.0, "label": "Complete", "style": "bar"},
+        })
+
+        # Purple/brand theme with custom buttons
+        send({
+            "sender": "figma",
+            "title": "Design Review Ready",
+            "body": "Landing page v3 needs your feedback",
+            "icon": "figma",
+            "priority": "high",
+            "style": {
+                "accentColor": "#a855f7",
+                "iconColor": "#c084fc",
+                "iconBg": "rgba(168, 85, 247, 0.15)",
+                "titleColor": "#e9d5ff",
+                "btnBg": "#7c3aed",
+                "btnColor": "#ffffff",
+                "btn2Color": "#c084fc",
+            },
+            "actions": [
+                {"id": "review", "label": "Review", "style": "primary", "icon": "eye"},
+                {"id": "later", "label": "Later", "style": "secondary"},
+            ],
+        })
+
+        # Red alert with per-button overrides
+        send({
+            "sender": "pagerduty",
+            "title": "Incident #4821",
+            "body": "API latency > 2s for 5 minutes",
+            "icon": "siren",
+            "priority": "critical",
+            "style": {
+                "accentColor": "#ef4444",
+                "titleColor": "#fecaca",
+                "bodyColor": "#fca5a5",
+                "countdownColor": "#ef4444",
+            },
+            "actions": [
+                {"id": "ack", "label": "Acknowledge", "style": "primary", "bg": "#dc2626", "color": "#ffffff", "borderColor": "#b91c1c"},
+                {"id": "snooze", "label": "Snooze 15m", "style": "secondary"},
+            ],
+            "timeout": "never",
+        })
+
+        # Ocean blue minimal
+        send({
+            "sender": "analytics",
+            "title": "Weekly Report",
+            "body": "Revenue up 12% week-over-week",
+            "icon": "trending-up",
+            "style": {
+                "accentColor": "#06b6d4",
+                "iconColor": "#22d3ee",
+                "iconBg": "rgba(6, 182, 212, 0.12)",
+                "senderColor": "#67e8f9",
+                "titleColor": "#cffafe",
+                "bodyColor": "#a5f3fc",
+            },
+        })
 
     elif mode == "--fonts":
         print("Sending notifications with custom Google Fonts:")

@@ -129,12 +129,51 @@
   box-sizing: border-box;
 }
 
-/* -- Notification stack -- */
+/* -- Notification stack (Sonner-style) -- */
 .notification-stack {
+  position: relative;
+  width: 100%;
+}
+
+/* Collapsed: cards overlap behind the front one */
+.notification-stack[data-expanded="false"] .notification-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  transform:
+    translateY(calc(var(--index) * var(--stack-peek)))
+    scale(calc(1 - var(--index) * 0.05));
+  transform-origin: top center;
+  z-index: calc(var(--total) - var(--index));
+  opacity: calc(1 - var(--index) * 0.15);
+  transition: transform 400ms ease, opacity 400ms ease;
+}
+
+/* Front card in collapsed mode — keep first child in flow for height */
+.notification-stack[data-expanded="false"] .notification-card:first-child {
+  position: relative;
+}
+
+/* Hide cards beyond 3rd in collapsed stack */
+.notification-stack[data-expanded="false"] .notification-card:nth-child(n+4) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Expanded: normal vertical flow with gaps */
+.notification-stack[data-expanded="true"] {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: 100%;
+  gap: var(--expanded-gap);
+}
+
+.notification-stack[data-expanded="true"] .notification-card {
+  position: relative;
+  transform: none;
+  opacity: 1;
+  z-index: auto;
+  transition: transform 400ms ease, opacity 400ms ease;
 }
 
 /* ======================================================================
@@ -142,116 +181,23 @@
    ====================================================================== */
 .notification-card {
   position: relative;
-  border-radius: var(--panel-radius);
+  border-radius: var(--s-card-border-radius, var(--panel-radius));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  background:
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"),
-    var(--glass-bg);
+  background: var(--s-card-bg, var(--glass-bg));
   padding: 12px 14px;
   padding-right: 32px; /* clearance for close button */
   animation: slide-in-right 300ms cubic-bezier(0.16, 1, 0.3, 1);
-
-  /* 9-layer reflex shadow stack (Meetily liquid glass) */
-  box-shadow:
-    /* light reflexes */
-    inset 0 0 0 1px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 12%), transparent),
-    inset 0 1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 70%), transparent),
-    inset 0 -1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 40%), transparent),
-    inset 0 -4px 8px -4px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 30%), transparent),
-    /* dark reflexes */
-    inset 0 -1px 4px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 8%), transparent),
-    inset 0 2px 4px -2px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 14%), transparent),
-    inset 0 -4px 6px -3px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 6%), transparent),
-    /* outer drop shadows */
-    0 1px 5px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 10%), transparent),
-    0 6px 16px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 8%), transparent);
-
-  transition: transform 150ms ease, box-shadow 150ms ease;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  transition: transform 150ms ease;
 }
 
 .notification-card:hover {
   transform: translateX(-2px);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 16%), transparent),
-    inset 0 1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 80%), transparent),
-    inset 0 -1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 50%), transparent),
-    inset 0 -4px 8px -4px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 40%), transparent),
-    inset 0 -1px 4px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 10%), transparent),
-    inset 0 2px 4px -2px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 18%), transparent),
-    inset 0 -4px 6px -3px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 8%), transparent),
-    0 2px 8px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 14%), transparent),
-    0 8px 24px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 12%), transparent);
 }
 
-/* -- Priority accent — subtle top border glow -- */
-.notification-card.low {
-  border-top: 0.5px solid var(--accent-low);
-}
-
-.notification-card.normal {
-  border-top: 0.5px solid var(--accent-normal);
-}
-
-.notification-card.high {
-  border-top: 0.5px solid var(--accent-high);
-}
-
-.notification-card.critical {
-  border-top: 0.5px solid var(--accent-critical);
-}
-
-/* -- Critical pulsing glow (Meetily siri-style) -- */
-@property --pulse-opacity {
-  syntax: '<number>';
-  initial-value: 0.3;
-  inherits: false;
-}
-
-@keyframes glow-pulse {
-  0%   { --pulse-opacity: 0.25; }
-  50%  { --pulse-opacity: 0.9; }
-  100% { --pulse-opacity: 0.25; }
-}
-
-.notification-card.critical::before {
-  content: '';
-  position: absolute;
-  inset: -1.5px;
-  border-radius: calc(var(--panel-radius) + 1.5px);
-  background: rgba(255, 59, 48, var(--pulse-opacity));
-  animation: glow-pulse 2s ease-in-out infinite;
-  z-index: -1;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  padding: 1.5px;
-}
-
-.notification-card.critical::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: calc(var(--panel-radius) + 4px);
-  background: rgba(255, 59, 48, calc(var(--pulse-opacity) * 0.45));
-  animation: glow-pulse 2s ease-in-out infinite;
-  z-index: -2;
-  filter: blur(8px);
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  padding: 3px;
-}
 
 /* -- Dismiss animation -- */
 .notification-card.dismissing {
@@ -278,38 +224,38 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: var(--t-close-bg);
-  border: 0.5px solid var(--t-close-border);
+  background: var(--s-icon-bg, var(--t-close-bg));
+  border: 0.5px solid var(--s-icon-border-color, var(--t-close-border));
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--t-text);
+  color: var(--s-icon-color, var(--t-text));
   margin-top: 2px;
 }
 
-/* Priority-tinted icons */
+/* Priority-tinted icons (overridable via --s-icon-* variables) */
 .notification-card.low .notification-icon {
-  background: rgba(46, 213, 115, 0.12);
-  color: var(--accent-low);
-  border-color: rgba(46, 213, 115, 0.20);
+  background: var(--s-icon-bg, rgba(46, 213, 115, 0.12));
+  color: var(--s-icon-color, var(--accent-low));
+  border-color: var(--s-icon-border-color, rgba(46, 213, 115, 0.20));
 }
 
 .notification-card.normal .notification-icon {
-  background: rgba(74, 158, 255, 0.12);
-  color: var(--accent-normal);
-  border-color: rgba(74, 158, 255, 0.20);
+  background: var(--s-icon-bg, rgba(74, 158, 255, 0.12));
+  color: var(--s-icon-color, var(--accent-normal));
+  border-color: var(--s-icon-border-color, rgba(74, 158, 255, 0.20));
 }
 
 .notification-card.high .notification-icon {
-  background: rgba(255, 165, 2, 0.12);
-  color: var(--accent-high);
-  border-color: rgba(255, 165, 2, 0.20);
+  background: var(--s-icon-bg, rgba(255, 165, 2, 0.12));
+  color: var(--s-icon-color, var(--accent-high));
+  border-color: var(--s-icon-border-color, rgba(255, 165, 2, 0.20));
 }
 
 .notification-card.critical .notification-icon {
-  background: rgba(255, 59, 48, 0.15);
-  color: var(--accent-critical);
-  border-color: rgba(255, 59, 48, 0.25);
+  background: var(--s-icon-bg, rgba(255, 59, 48, 0.15));
+  color: var(--s-icon-color, var(--accent-critical));
+  border-color: var(--s-icon-border-color, rgba(255, 59, 48, 0.25));
 }
 
 .notification-text {
@@ -332,7 +278,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--t-text-dim);
+  color: var(--s-sender-color, var(--t-text-dim));
 }
 
 .notification-time {
@@ -340,7 +286,7 @@
   font-size: 12px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
-  color: var(--t-text-dim);
+  color: var(--s-time-color, var(--t-text-dim));
   margin-left: auto;
   padding-right: 14px; /* keep clear of close button */
   opacity: 0.8;
@@ -357,9 +303,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--t-close-bg);
-  border: 1px solid var(--t-close-border);
-  color: var(--t-close-color);
+  background: var(--s-close-bg, var(--t-close-bg));
+  border: 1px solid var(--s-close-border-color, var(--t-close-border));
+  color: var(--s-close-color, var(--t-close-color));
   font-size: 10px;
   line-height: 1;
   opacity: 0;
@@ -376,9 +322,9 @@
 
 /* -- Content -- */
 .notification-title {
-  font-size: 14px;
+  font-size: var(--s-title-font-size, 14px);
   font-weight: 600;
-  color: var(--t-text);
+  color: var(--s-title-color, var(--t-text));
   margin-bottom: 3px;
   line-height: 1.3;
   overflow: hidden;
@@ -387,9 +333,9 @@
 }
 
 .notification-body {
-  font-size: 13px;
+  font-size: var(--s-body-font-size, 13px);
   font-weight: 400;
-  color: var(--t-text-mid);
+  color: var(--s-body-color, var(--t-text-mid));
   line-height: 1.5;
   word-break: break-word;
   letter-spacing: 0.01em;
@@ -403,14 +349,14 @@
 .progress-bar,
 .progress-ring {
   height: 3px;
-  background: var(--t-progress-track);
+  background: var(--s-progress-track-color, var(--t-progress-track));
   border-radius: 2px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--accent-normal);
+  background: var(--s-progress-color, var(--accent-normal));
   border-radius: 2px;
   transition: width 250ms ease;
 }
@@ -442,12 +388,16 @@
   transition: background 150ms ease;
   white-space: nowrap;
   letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
 .action-button.primary {
-  background: var(--t-btn-bg);
-  border-color: var(--t-btn-border);
-  color: var(--t-btn-color);
+  background: var(--s-btn-bg, var(--t-btn-bg));
+  border-color: var(--s-btn-border-color, var(--t-btn-border));
+  color: var(--s-btn-color, var(--t-btn-color));
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
 }
 
@@ -460,9 +410,9 @@
 }
 
 .action-button.secondary {
-  background: var(--t-btn2-bg);
-  border-color: var(--t-btn2-border);
-  color: var(--t-btn2-color);
+  background: var(--s-btn2-bg, var(--t-btn2-bg));
+  border-color: var(--s-btn2-border-color, var(--t-btn2-border));
+  color: var(--s-btn2-color, var(--t-btn2-color));
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
 }
 
@@ -471,9 +421,9 @@
 }
 
 .action-button.danger {
-  background: #ff3b30;
-  border-color: rgba(0, 0, 0, 0.06);
-  color: white;
+  background: var(--s-danger-bg, #ff3b30);
+  border-color: var(--s-danger-border-color, rgba(0, 0, 0, 0.06));
+  color: var(--s-danger-color, white);
   box-shadow: 0 1px 4px rgba(255, 59, 48, 0.3);
 }
 
@@ -504,11 +454,11 @@
   animation: countdown-shrink var(--countdown-duration) linear forwards;
 }
 
-/* Priority-colored countdown */
-.notification-card.low .countdown-fill { background: var(--accent-low); opacity: 0.5; }
-.notification-card.normal .countdown-fill { background: var(--accent-normal); opacity: 0.5; }
-.notification-card.high .countdown-fill { background: var(--accent-high); opacity: 0.6; }
-.notification-card.critical .countdown-fill { background: var(--accent-critical); opacity: 0.7; }
+/* Priority-colored countdown (overridable via --s-countdown-color) */
+.notification-card.low .countdown-fill { background: var(--s-countdown-color, var(--accent-low)); opacity: 0.5; }
+.notification-card.normal .countdown-fill { background: var(--s-countdown-color, var(--accent-normal)); opacity: 0.5; }
+.notification-card.high .countdown-fill { background: var(--s-countdown-color, var(--accent-high)); opacity: 0.6; }
+.notification-card.critical .countdown-fill { background: var(--s-countdown-color, var(--accent-critical)); opacity: 0.7; }
 
 /* Pause countdown on hover */
 .notification-card:hover .countdown-fill {

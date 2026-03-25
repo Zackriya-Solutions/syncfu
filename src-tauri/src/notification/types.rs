@@ -37,6 +37,101 @@ pub struct Action {
     pub id: String,
     pub label: String,
     pub style: ActionStyle,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bg: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_color: Option<String>,
+}
+
+/// Per-notification style overrides. All fields optional — defaults come from CSS variables.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleOverrides {
+    /// Override the priority accent color (affects icon tint, progress, countdown, top border)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accent_color: Option<String>,
+    /// Card background color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub card_bg: Option<String>,
+    /// Card border radius (e.g. "18px")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub card_border_radius: Option<String>,
+    /// Icon stroke/fill color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_color: Option<String>,
+    /// Icon box background
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_bg: Option<String>,
+    /// Icon box border color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_border_color: Option<String>,
+    /// Title text color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title_color: Option<String>,
+    /// Title font size (e.g. "14px")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title_font_size: Option<String>,
+    /// Body text color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_color: Option<String>,
+    /// Body font size (e.g. "13px")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_font_size: Option<String>,
+    /// Sender label color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender_color: Option<String>,
+    /// Timestamp color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_color: Option<String>,
+    /// Primary button background
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btn_bg: Option<String>,
+    /// Primary button text color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btn_color: Option<String>,
+    /// Primary button border color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btn_border_color: Option<String>,
+    /// Secondary button background
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btn2_bg: Option<String>,
+    /// Secondary button text color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btn2_color: Option<String>,
+    /// Secondary button border color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub btn2_border_color: Option<String>,
+    /// Danger button background
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub danger_bg: Option<String>,
+    /// Danger button text color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub danger_color: Option<String>,
+    /// Danger button border color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub danger_border_color: Option<String>,
+    /// Progress bar fill color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress_color: Option<String>,
+    /// Progress bar track color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress_track_color: Option<String>,
+    /// Countdown bar color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub countdown_color: Option<String>,
+    /// Close button background
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub close_bg: Option<String>,
+    /// Close button icon color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub close_color: Option<String>,
+    /// Close button border color
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub close_border_color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,6 +192,8 @@ pub struct NotificationPayload {
     pub sound: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "callbackUrl")]
     pub callback_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<StyleOverrides>,
     #[serde(default = "now")]
     pub created_at: DateTime<Utc>,
 }
@@ -236,9 +333,87 @@ mod tests {
             id: "test".to_string(),
             label: "Test".to_string(),
             style: ActionStyle::Danger,
+            icon: None,
+            bg: None,
+            color: None,
+            border_color: None,
         };
         let json = serde_json::to_string(&action).unwrap();
         let deserialized: Action = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.style, ActionStyle::Danger);
+    }
+
+    #[test]
+    fn test_action_with_custom_style_fields() {
+        let json = r##"{
+            "id": "deploy",
+            "label": "Deploy",
+            "style": "primary",
+            "icon": "rocket",
+            "bg": "#22c55e",
+            "color": "#ffffff",
+            "borderColor": "#16a34a"
+        }"##;
+        let action: Action = serde_json::from_str(json).unwrap();
+        assert_eq!(action.icon.as_deref(), Some("rocket"));
+        assert_eq!(action.bg.as_deref(), Some("#22c55e"));
+        assert_eq!(action.color.as_deref(), Some("#ffffff"));
+        assert_eq!(action.border_color.as_deref(), Some("#16a34a"));
+    }
+
+    #[test]
+    fn test_style_overrides_empty_json() {
+        let json = "{}";
+        let style: StyleOverrides = serde_json::from_str(json).unwrap();
+        assert!(style.accent_color.is_none());
+        assert!(style.card_bg.is_none());
+        assert!(style.title_color.is_none());
+    }
+
+    #[test]
+    fn test_style_overrides_partial_json() {
+        let json = r##"{
+            "accentColor": "#ff6b6b",
+            "titleColor": "#ffffff",
+            "btnBg": "#22c55e"
+        }"##;
+        let style: StyleOverrides = serde_json::from_str(json).unwrap();
+        assert_eq!(style.accent_color.as_deref(), Some("#ff6b6b"));
+        assert_eq!(style.title_color.as_deref(), Some("#ffffff"));
+        assert_eq!(style.btn_bg.as_deref(), Some("#22c55e"));
+        assert!(style.body_color.is_none());
+    }
+
+    #[test]
+    fn test_notification_payload_with_style() {
+        let json = r##"{
+            "sender": "deploy",
+            "title": "Deploy Complete",
+            "body": "v2.0 is live",
+            "style": {
+                "accentColor": "#22c55e",
+                "cardBg": "rgba(0, 50, 0, 0.95)",
+                "iconColor": "#4ade80",
+                "btnBg": "#22c55e",
+                "btnColor": "#ffffff"
+            }
+        }"##;
+        let payload: NotificationPayload = serde_json::from_str(json).unwrap();
+        let style = payload.style.unwrap();
+        assert_eq!(style.accent_color.as_deref(), Some("#22c55e"));
+        assert_eq!(style.card_bg.as_deref(), Some("rgba(0, 50, 0, 0.95)"));
+        assert_eq!(style.btn_bg.as_deref(), Some("#22c55e"));
+    }
+
+    #[test]
+    fn test_style_overrides_skips_none_in_serialization() {
+        let style = StyleOverrides {
+            accent_color: Some("#ff0000".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&style).unwrap();
+        assert!(json.contains("accentColor"));
+        assert!(!json.contains("cardBg"));
+        assert!(!json.contains("titleColor"));
     }
 }

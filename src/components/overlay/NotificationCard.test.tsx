@@ -157,4 +157,75 @@ describe("NotificationCard", () => {
     const card = screen.getByTestId("notification-card");
     expect(card.className).toContain("github-dark");
   });
+
+  it("applies style overrides as CSS custom properties", () => {
+    render(
+      <NotificationCard
+        notification={makeNotification({
+          style: {
+            accentColor: "#22c55e",
+            titleColor: "#bbf7d0",
+            cardBg: "rgba(10, 40, 20, 0.96)",
+          },
+        })}
+        onDismiss={vi.fn()}
+        onAction={vi.fn()}
+      />
+    );
+
+    const card = screen.getByTestId("notification-card");
+    expect(card.style.getPropertyValue("--s-accent-color")).toBe("#22c55e");
+    expect(card.style.getPropertyValue("--s-title-color")).toBe("#bbf7d0");
+    expect(card.style.getPropertyValue("--s-card-bg")).toBe("rgba(10, 40, 20, 0.96)");
+  });
+
+  it("renders without style overrides (no extra CSS vars)", () => {
+    render(
+      <NotificationCard
+        notification={makeNotification()}
+        onDismiss={vi.fn()}
+        onAction={vi.fn()}
+      />
+    );
+
+    const card = screen.getByTestId("notification-card");
+    expect(card.style.getPropertyValue("--s-accent-color")).toBe("");
+  });
+
+  it("applies per-action inline styles", () => {
+    render(
+      <NotificationCard
+        notification={makeNotification({
+          actions: [
+            { id: "deploy", label: "Deploy", style: "primary", bg: "#22c55e", color: "#fff" },
+          ],
+        })}
+        onDismiss={vi.fn()}
+        onAction={vi.fn()}
+      />
+    );
+
+    const button = screen.getByText("Deploy");
+    // Browser normalizes hex to rgb
+    expect(button.style.background).toBeTruthy();
+    expect(button.style.color).toBeTruthy();
+  });
+
+  it("renders action button with icon", () => {
+    render(
+      <NotificationCard
+        notification={makeNotification({
+          actions: [
+            { id: "view", label: "View", style: "primary", icon: "eye" },
+          ],
+        })}
+        onDismiss={vi.fn()}
+        onAction={vi.fn()}
+      />
+    );
+
+    const button = screen.getByText("View");
+    // Button should contain an SVG icon from NotificationIcon
+    expect(button.querySelector("svg")).toBeTruthy();
+  });
 });
