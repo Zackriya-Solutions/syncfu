@@ -1,0 +1,22 @@
+[package]
+name = "syncfu-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI for syncfu — send notifications from anywhere"
+license = "MIT"
+
+[[bin]]
+name = "syncfu"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros"] }
+anyhow = "1"
+
+[dev-dependencies]
+wiremock = "0.6"
+tokio = { version = "1", features = ["rt", "macros", "test-util"] }

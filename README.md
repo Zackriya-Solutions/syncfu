@@ -4,15 +4,21 @@
 
 syncfu is a standalone overlay notification system that sits between your background processes — AI agents, autonomous loops, skills, CI pipelines, cron jobs, anything — and you. It renders always-on-top native notifications that bypass the OS notification center, so nothing gets buried.
 
-One HTTP call. One notification on your screen. That's it.
+One command. One notification on your screen. That's it.
 
 ```bash
-curl -X POST localhost:9868/notify \
-  -H "Content-Type: application/json" \
-  -d '{"sender":"claude","title":"Loop complete","body":"All 47 tests passing.","icon":"check-circle","font":"Space Grotesk"}'
+syncfu send "All 47 tests passing."
 ```
 
-Built with Tauri v2 + Rust + React. Cross-platform: macOS, Windows, Linux.
+Need more? Add flags.
+
+```bash
+syncfu send -t "Loop complete" -p high -i check-circle \
+  --action "open:Open PR:primary" --action "skip:Skip:secondary" \
+  "All 47 tests passing."
+```
+
+Built with Tauri v2 + Rust + React. macOS first, Windows + Linux coming.
 
 ---
 
@@ -49,8 +55,8 @@ CLI      ──HTTP POST──▸ syncfu server ──▸ Overlay Notification
 
 | Protocol | Port | Purpose |
 |----------|------|---------|
-| HTTP REST | `9876` | Send, update, dismiss notifications |
-| WebSocket | `9877` | Bidirectional — send notifications, receive action callbacks |
+| HTTP REST | `9868` | Send, update, dismiss notifications |
+| WebSocket | `9869` | Bidirectional — send notifications, receive action callbacks (planned) |
 
 ---
 
@@ -93,18 +99,27 @@ cargo install syncfu-cli
 
 ```bash
 # Start syncfu (it lives in your system tray)
-# On first launch, it asks to start automatically on login
 syncfu
 
-# Send your first notification
-syncfu-cli send --title "Hello" --body "syncfu is running"
+# Send your first notification — just a message
+syncfu send "Hello from syncfu!"
+
+# With a title and priority
+syncfu send -t "Build Complete" -p high "All 142 tests passing"
+
+# With action buttons
+syncfu send -t "PR #42" --action "approve:Approve:primary" --action "skip:Skip:secondary" "Review requested"
 
 # Or use curl
-curl -X POST localhost:9876/notify \
+curl -X POST localhost:9868/notify \
+  -H "Content-Type: application/json" \
   -d '{"sender":"test","title":"It works","body":"Your first notification"}'
 
-# Open the desktop app to browse notification history
-# (click "Open syncfu" in the tray menu, or click the dock icon on macOS)
+# List active notifications
+syncfu list | jq '.[].title'
+
+# Check server health
+syncfu health
 ```
 
 ### Always running
@@ -128,15 +143,18 @@ Your `/remind` skill fires a cron, but the alert is just a terminal bell you'll 
 
 ```bash
 # Inside any Claude Code skill or hook
-curl -s -X POST localhost:9876/notify \
-  -d "{\"sender\":\"remind\",\"title\":\"$TITLE\",\"body\":\"$BODY\",\"sound\":\"default\",\"actions\":[{\"id\":\"done\",\"label\":\"Done\",\"style\":\"primary\"},{\"id\":\"snooze\",\"label\":\"Snooze 15m\",\"style\":\"secondary\"}]}"
+syncfu send -t "$TITLE" -s remind --sound default \
+  --action "done:Done:primary" --action "snooze:Snooze 15m:secondary" \
+  "$BODY"
 ```
 
 **Autonomous coding loops**
 Running `/loop` or a multi-agent workflow that takes 30 minutes? Get notified when each phase completes, when tests fail, or when the loop needs human input.
 
-```json
-{"sender":"loop-operator","title":"Phase 3/5 complete","body":"Integration tests: **42 passed**, 0 failed\nStarting E2E phase...","progress":{"value":0.6,"label":"3 of 5","style":"bar"}}
+```bash
+syncfu send -t "Phase 3/5 complete" -s loop-operator \
+  --progress 0.6 --progress-label "3 of 5" \
+  "Integration tests: 42 passed, 0 failed. Starting E2E phase..."
 ```
 
 **Agent handoff alerts**
@@ -155,8 +173,10 @@ Running 5 parallel agents? Each one reports status to syncfu with its own sender
 **Build notifications**
 GitHub Actions, GitLab CI, Jenkins — POST to syncfu when builds finish. Include pass/fail status, duration, coverage delta, and a "Open PR" action button.
 
-```json
-{"sender":"github-actions","title":"Build passed","body":"**main** built in 3m 42s\n- 142 tests passed\n- Coverage: 87% (+2.1%)","priority":"normal","actions":[{"id":"open_pr","label":"Open PR","style":"primary"}],"sound":"success","group":"ci-builds"}
+```bash
+syncfu send -t "Build passed" -s github-actions -i check-circle \
+  --action "open_pr:Open PR:primary" --sound success --group ci-builds \
+  "main built in 3m 42s — 142 tests passed, coverage 87% (+2.1%)"
 ```
 
 **Deploy progress**
@@ -176,8 +196,9 @@ Long-running migrations report progress: *"Migrating users table — 2.4M of 8.1
 `cargo watch` or `jest --watch` pipes results to syncfu. Green notification when tests pass. Red critical-priority notification when they fail — even if your terminal is buried under 14 windows.
 
 ```bash
-# Watch tests and notify on failure
-cargo test 2>&1 || syncfu-cli send --title "Tests failed" --body "$(cargo test 2>&1 | tail -20)" --priority critical --sound error
+# Notify on test pass or fail
+cargo test && syncfu send -t "Tests passed" -p low -i check-circle "All green" \
+  || syncfu send -t "Tests failed" -p critical -i x-circle "Check terminal"
 ```
 
 **Long compilation finished**
@@ -200,13 +221,8 @@ Run `eslint` or `tsc --noEmit` in the background and get a clean/dirty notificat
 If you have ADHD, you know: setting a reminder is useless if the reminder is a silent badge on an app you don't check. syncfu puts the reminder ON YOUR SCREEN as an unmissable overlay.
 
 ```bash
-# From the /remind skill
-syncfu-cli send \
-  --title "Stand-up in 5 minutes" \
-  --body "Prepare: yesterday's PR review, today's auth refactor" \
-  --priority high \
-  --sound default \
-  --timeout 300
+syncfu send -t "Stand-up in 5 minutes" -p high --sound default --timeout 300 \
+  "Prepare: yesterday's PR review, today's auth refactor"
 ```
 
 **Time-boxed focus sessions**
@@ -253,8 +269,9 @@ Your nightly backup, database vacuum, or log rotation finished (or failed). Know
 **Training run progress**
 Long-running ML training jobs report epoch progress, loss curves (as text), and ETA via WebSocket. Get notified at milestones or when training completes.
 
-```json
-{"sender":"training","title":"Epoch 45/100","body":"Loss: 0.0234 (↓12%)\nVal accuracy: 94.2%\nETA: 2h 15m","progress":{"value":0.45,"style":"bar"},"group":"training-run-7"}
+```bash
+syncfu send -t "Epoch 45/100" -s training --progress 0.45 --group training-run-7 \
+  "Loss: 0.0234 (↓12%) — Val accuracy: 94.2% — ETA: 2h 15m"
 ```
 
 **Data pipeline stage completion**
@@ -406,56 +423,56 @@ Open syncfu from the system tray or dock to see your notification history — ev
 | `theme` | string | no | `light` or `dark` (auto-follows system by default) |
 | `sound` | string | no | `default`, `success`, `error`, or `none` |
 | `callback_url` | string | no | URL to POST when an action button is clicked |
+| `style` | object | no | Per-notification style overrides (see below) |
 
-### WebSocket protocol
+### Style overrides
 
-Connect to `ws://localhost:9877` for bidirectional communication.
+The `style` object lets you customize every visual property per notification. All fields optional:
 
-**Send notifications:**
 ```json
-{"type": "notify", "payload": { "sender": "my-app", "title": "Hello", "body": "World" }}
+{
+  "style": {
+    "accentColor": "#22c55e",
+    "cardBg": "rgba(10, 40, 20, 0.96)",
+    "iconColor": "#4ade80",
+    "iconBg": "rgba(34, 197, 94, 0.15)",
+    "titleColor": "#bbf7d0",
+    "bodyColor": "#86efac",
+    "senderColor": "#67e8f9",
+    "btnBg": "#7c3aed",
+    "btnColor": "#ffffff",
+    "btn2Color": "#c084fc",
+    "dangerBg": "#dc2626",
+    "progressColor": "#22c55e",
+    "countdownColor": "#ef4444"
+  }
+}
 ```
 
-**Receive action callbacks:**
+Full list: `accentColor`, `cardBg`, `cardBorderRadius`, `iconColor`, `iconBg`, `iconBorderColor`, `titleColor`, `titleFontSize`, `bodyColor`, `bodyFontSize`, `senderColor`, `timeColor`, `btnBg`, `btnColor`, `btnBorderColor`, `btn2Bg`, `btn2Color`, `btn2BorderColor`, `dangerBg`, `dangerColor`, `dangerBorderColor`, `progressColor`, `progressTrackColor`, `countdownColor`, `closeBg`, `closeColor`, `closeBorderColor`.
+
+### Per-action button styling
+
+Each action button can override its own colors:
+
 ```json
-{"type": "action", "notification_id": "uuid", "action_id": "approve"}
-{"type": "dismissed", "notification_id": "uuid", "reason": "timeout"}
-```
+{
+  "actions": [
+    {
+      "id": "deploy",
+      "label": "Deploy",
+      "style": "primary",
+      "icon": "rocket",
+      "bg": "#22c55e",
+      "color": "#ffffff",
+      "borderColor": "#16a34a"
+    }
+  ]
+}
 
-**Subscribe to a specific sender's events:**
-```json
-{"type": "subscribe", "sender": "my-app"}
-```
+### WebSocket protocol (planned)
 
----
-
-## CLI
-
-```bash
-syncfu-cli send --title "Done" --body "All tests passed" --sound success
-syncfu-cli send --title "Deploy" --body "Deploying..." --progress 0.5 --group deploys
-syncfu-cli dismiss <id>
-syncfu-cli dismiss-all
-syncfu-cli list
-syncfu-cli history --sender ci --limit 20
-syncfu-cli status
-```
-
-### Pipe-friendly
-
-```bash
-# Notify when a long command finishes
-cargo build --release && syncfu-cli send --title "Build done" --sound success \
-  || syncfu-cli send --title "Build failed" --priority critical --sound error
-
-# Pipe output as notification body
-kubectl get pods --no-headers | syncfu-cli send --title "Pod Status" --body -
-
-# Watch a log and notify on errors
-tail -f app.log | grep --line-buffered "ERROR" | while read line; do
-  syncfu-cli send --title "Error detected" --body "$line" --priority high
-done
-```
+Bidirectional communication on port `9869`. Not yet implemented.
 
 ---
 
@@ -469,7 +486,7 @@ Add to your `.claude/hooks.json` to get notified on every agent completion:
 {
   "hooks": {
     "Stop": [{
-      "command": "syncfu-cli send --title 'Agent complete' --body \"$(git diff --stat HEAD~1 2>/dev/null || echo 'No changes')\" --sound default"
+      "command": "syncfu send -t 'Agent done' \"$(git diff --stat HEAD~1 2>/dev/null || echo 'No changes')\""
     }]
   }
 }
@@ -481,19 +498,21 @@ Add to your `.claude/hooks.json` to get notified on every agent completion:
 - name: Notify syncfu
   if: always()
   run: |
-    STATUS=${{ job.status }}
-    curl -s -X POST http://your-machine:9876/notify \
-      -H "Content-Type: application/json" \
-      -d "{\"sender\":\"github-actions\",\"title\":\"${{ github.workflow }} — $STATUS\",\"body\":\"${{ github.repository }}@${{ github.ref_name }}\",\"priority\":\"$([ $STATUS = 'success' ] && echo normal || echo critical)\",\"sound\":\"$([ $STATUS = 'success' ] && echo success || echo error)\"}"
+    syncfu send -t "${{ github.workflow }} — ${{ job.status }}" \
+      -s github-actions \
+      -p ${{ job.status == 'success' && 'normal' || 'critical' }} \
+      "${{ github.repository }}@${{ github.ref_name }}"
+  env:
+    SYNCFU_SERVER: http://your-machine:9868
 ```
 
 ### Shell aliases
 
 ```bash
 # Add to .zshrc / .bashrc
-alias notify='syncfu-cli send --title'
-alias notify-done='syncfu-cli send --title "Done" --body'
-alias notify-fail='syncfu-cli send --title "Failed" --priority critical --sound error --body'
+alias notify='syncfu send -t'
+alias notify-done='syncfu send -t "Done"'
+alias notify-fail='syncfu send -t "Failed" -p critical --sound error'
 
 # Usage
 long-running-command; notify-done "Finished long-running-command"
@@ -503,7 +522,7 @@ long-running-command; notify-done "Finished long-running-command"
 
 ```javascript
 // Node.js
-await fetch('http://localhost:9876/notify', {
+await fetch('http://localhost:9868/notify', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ sender: 'my-app', title: 'Done', body: 'Task complete' })
@@ -513,7 +532,7 @@ await fetch('http://localhost:9876/notify', {
 ```python
 # Python
 import requests
-requests.post('http://localhost:9876/notify', json={
+requests.post('http://localhost:9868/notify', json={
     'sender': 'my-app', 'title': 'Done', 'body': 'Task complete'
 })
 ```
@@ -526,9 +545,9 @@ requests.post('http://localhost:9876/notify', json={
                            ┌─────────────────────────────────┐
                            │         syncfu (Tauri v2)        │
                            │                                  │
- HTTP POST :9876 ─────────▸│  axum server ──▸ Notification    │
+ HTTP POST :9868 ─────────▸│  axum server ──▸ Notification    │
                            │                  Manager         │──emit──▸ React Overlay
- WebSocket :9877 ─────────▸│  tungstenite ──▸ (Arc shared)   │         (transparent window)
+ WebSocket :9869 ─────────▸│  tungstenite ──▸ (Arc shared)   │         (transparent window)
                            │                      │           │
  CLI ─────────────────────▸│                 ┌────┴────┐      │
                            │                 │ History │      │
@@ -551,8 +570,8 @@ syncfu stores settings in `{app_data_dir}/syncfu/settings.json`:
 
 ```json
 {
-  "http_port": 9876,
-  "ws_port": 9877,
+  "http_port": 9868,
+  "ws_port": 9869,
   "position": "top-right",
   "max_visible": 5,
   "default_timeout_seconds": 8,
@@ -600,11 +619,14 @@ Then use `"theme": "github-dark"` in your notification payload.
 - [x] Relative timestamps ("just now", "5m ago")
 - [x] Priority-tinted icon containers
 - [x] Dynamic panel resize (no click-blocking)
-- [x] 119 tests (68 frontend + 51 Rust)
+- [x] 154 tests (72 frontend + 56 Rust + 26 CLI)
 - [x] Webhook callbacks (action buttons POST to `callbackUrl`)
+- [x] Per-notification style overrides (27 customizable properties)
+- [x] Per-action button styling (bg, color, borderColor, icon)
+- [x] CLI binary (`syncfu send/dismiss/list/health`)
+- [x] 170 tests (72 frontend + 56 Rust + 16 CLI unit + 10 CLI integration)
 - [ ] Click-through mechanism
 - [ ] WebSocket server (port 9869)
-- [ ] CLI tool
 - [ ] Markdown body rendering
 - [ ] Notification grouping
 - [ ] Sound playback
