@@ -41,7 +41,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .on_menu_event(move |app, event| {
             match event.id().as_ref() {
                 id if id == MENU_OPEN => {
-                    handle_open(app);
+                    open_main_window(app);
                 }
                 id if id == MENU_CLEAR_ALL => {
                     handle_clear_all(app);
@@ -61,7 +61,8 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Open or create the main app window.
-fn handle_open(app: &AppHandle) {
+/// Public so it can be called from the dock reopen handler.
+pub fn open_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();

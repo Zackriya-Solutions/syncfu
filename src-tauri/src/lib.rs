@@ -4,7 +4,7 @@ pub mod tray;
 use std::sync::Arc;
 
 use notification::manager::NotificationManager;
-use notification::types::{NotificationPayload, NotificationUpdate};
+use notification::types::{NotificationPayload, NotificationUpdate, Priority, Timeout};
 use tauri::Emitter;
 
 #[tauri::command]
@@ -77,6 +77,34 @@ async fn health(
     }))
 }
 
+/// Send a test notification for manual testing during development.
+#[tauri::command]
+async fn test_notify(
+    manager: tauri::State<'_, Arc<NotificationManager>>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let payload = NotificationPayload {
+        id: uuid::Uuid::new_v4().to_string(),
+        sender: "syncfu".to_string(),
+        title: "Test Notification".to_string(),
+        body: "syncfu is working! This is a test notification.".to_string(),
+        icon: None,
+        priority: Priority::Normal,
+        timeout: Timeout::default(),
+        actions: vec![],
+        progress: None,
+        group: None,
+        theme: None,
+        sound: None,
+        callback_url: None,
+        created_at: chrono::Utc::now(),
+    };
+    let id = manager.add(payload.clone()).await;
+    app.emit("notification:add", &payload)
+        .map_err(|e| e.to_string())?;
+    Ok(id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let manager = NotificationManager::new();
@@ -95,6 +123,7 @@ pub fn run() {
             update_notification,
             get_active_notifications,
             health,
+            test_notify,
         ])
         .setup(|app| {
             // Set up system tray
@@ -141,6 +170,13 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running syncfu");
+        .build(tauri::generate_context!())
+        .expect("error while building syncfu")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                // macOS dock click — re-show the main window
+                tray::menu::open_main_window(app);
+            }
+        });
 }
