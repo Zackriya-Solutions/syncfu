@@ -1,0 +1,179 @@
+/* Overlay window — transparent fullscreen container */
+.overlay-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Stack container — positioned top-right */
+.notification-stack {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  width: 380px;
+  pointer-events: none;
+}
+
+/* Individual notification cards get pointer-events back */
+.notification-card {
+  pointer-events: auto;
+  background: rgba(22, 33, 62, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  animation: slide-in-right 300ms ease-out;
+}
+
+.notification-card:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateX(-2px);
+}
+
+/* Priority accent — left border */
+.notification-card.low {
+  border-left: 3px solid var(--color-low);
+}
+
+.notification-card.normal {
+  border-left: 3px solid var(--color-normal);
+}
+
+.notification-card.high {
+  border-left: 3px solid var(--color-high);
+}
+
+.notification-card.critical {
+  border-left: 3px solid var(--color-critical);
+  background: rgba(40, 20, 30, 0.95);
+}
+
+/* Header row */
+.notification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.notification-sender {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+  letter-spacing: 0.3px;
+  text-transform: lowercase;
+}
+
+.notification-dismiss {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.notification-dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text);
+}
+
+/* Content */
+.notification-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.notification-body {
+  font-size: 13px;
+  color: var(--color-text-dim);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+/* Progress bar */
+.notification-progress {
+  margin-top: 10px;
+}
+
+.progress-bar,
+.progress-ring {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 2px;
+  transition: width var(--transition-normal);
+}
+
+.progress-label {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* Action buttons */
+.notification-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.action-button {
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.action-button.primary {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.action-button.primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.action-button.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text);
+}
+
+.action-button.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.action-button.danger {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.action-button.danger:hover {
+  opacity: 0.85;
+}
