@@ -31,6 +31,7 @@ export const core = {
 const mockCurrentWindow = {
   label: "main",
   setIgnoreCursorEvents: vi.fn(() => Promise.resolve()),
+  setSize: vi.fn(() => Promise.resolve()),
   show: vi.fn(() => Promise.resolve()),
   hide: vi.fn(() => Promise.resolve()),
   close: vi.fn(() => Promise.resolve()),
@@ -39,6 +40,7 @@ const mockCurrentWindow = {
 
 export const window = {
   getCurrentWindow: vi.fn(() => mockCurrentWindow),
+  LogicalSize: vi.fn((width: number, height: number) => ({ width, height, type: "Logical" })),
   Window: {
     getByLabel: vi.fn((_label: string) => null),
   },
