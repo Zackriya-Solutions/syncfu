@@ -26,6 +26,7 @@ export interface NotificationPayload {
   readonly title: string;
   readonly body: string;
   readonly icon?: string;
+  readonly font?: string;
   readonly priority: Priority;
   readonly timeout: Timeout | "never" | "default";
   readonly actions: readonly Action[];

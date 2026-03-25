@@ -535,17 +535,29 @@ These files contain patterns to reuse/adapt:
 
 ---
 
-## Current Status (2026-03-25)
+## Current Status (2026-03-26)
 
 ### Completed
 - **Phase 1**: Scaffold, overlay window, main app window, system tray, CSS dark theme, multi-window routing
-- **Phase 2** (partial): Notification types, manager, Zustand stores, overlay component, cards, hooks
+- **Phase 2**: Notification types, manager, Zustand stores, overlay component, cards, hooks — overlay rendering fully working
 - **Phase 4** (partial): HTTP server on port 9868 (notify, dismiss, update, dismiss-all, health, active)
 - **Logging**: tauri-plugin-log with 5MB file rotation, dev/prod separate files (syncfu-dev.log / syncfu.log), webview console bridging
-- **Tests**: 103 total (65 frontend @ 97.56% coverage, 38 Rust)
+- **NSPanel overlay**: macOS NSPanel via tauri-nspanel (non-activating, joins all Spaces, proper z-order)
+- **Liquid Glass design**: Adapted from Meetily mockup — 9-layer reflex shadows, backdrop blur, 18px radius
+- **Light/dark theme**: Auto via prefers-color-scheme + per-card override via `theme` field
+- **Lucide icons**: Programmable via `icon` field (e.g. `"icon": "phone"`)
+- **Google Fonts**: Programmable via `font` field — dynamically loaded from Google Fonts CDN
+- **Dismiss animation**: Slide-out-right + fade (280ms)
+- **Critical pulsing glow**: Siri-style red border glow with blurred outer halo
+- **Auto-dismiss countdown**: Priority-colored bar that shrinks, pauses on hover
+- **Relative timestamps**: "just now" → "5m ago" → "1h ago", ticks at smart intervals
+- **Priority-tinted icons**: Icon containers colored by priority (blue/green/orange/red)
+- **Dynamic panel resize**: Panel fits exactly to content height, no click-blocking transparent area
+- **Grain texture**: Subtle SVG noise at 3% opacity for depth
+- **Typography**: SF Mono for sender/timestamp (dev-tool identity), SF Pro for content
+- **Tests**: 112 total (67 frontend, 45 Rust)
 
 ### In Progress
-- Debugging overlay rendering (HTTP server stores notifications but overlay doesn't display them visually)
 - MainApp.tsx (shell only, needs enhanced UI)
 
 ### Not Started
@@ -559,7 +571,7 @@ These files contain patterns to reuse/adapt:
 ### Known Issues
 - Port 9876 conflicts with Meetily Pro → changed to 9868
 - `tauri-plugin-autostart` v2 doesn't accept config map in tauri.conf.json → removed, configured programmatically
-- Overlay window receives Tauri events but notifications not visually rendering (needs debugging)
+- `pnpm approve-builds` required interactively before first `cargo tauri dev`
 
 ---
 

@@ -1,15 +1,135 @@
-/* Overlay panel window — small positioned window, not fullscreen */
+/* ========================================================================
+   syncfu Notification Overlay — Liquid Glass Design
+   Adapted from Meetily toast-mockup.html (light + dark)
+
+   Theme resolution:
+   1. Per-card override via .light / .dark class (from notification `theme` field)
+   2. System appearance via prefers-color-scheme (auto)
+   ======================================================================== */
+
+/* -- Shared design tokens -- */
+:root {
+  --glass-blur: 40px;
+  --glass-saturation: 1.8;
+  --glass-bg-dark: rgba(30, 30, 35, 0.96);
+  --glass-bg-light: rgba(255, 255, 255, 0.96);
+  --glass-bg: var(--glass-bg-dark);
+  --panel-radius: 18px;
+  --btn-radius: 12px;
+  --close-size: 18px;
+
+  /* Priority accent colors */
+  --accent-low: #2ed573;
+  --accent-normal: #4a9eff;
+  --accent-high: #ffa502;
+  --accent-critical: #ff3b30;
+}
+
+/* -- Theme-adaptive tokens (dark default, light override below) -- */
+:root {
+  --glass-reflex-light: 0.3;
+  --glass-reflex-dark: 2;
+  --t-text: rgba(255, 255, 255, 0.85);
+  --t-text-mid: rgba(255, 255, 255, 0.62);
+  --t-text-dim: rgba(255, 255, 255, 0.40);
+  --t-close-bg: rgba(255, 255, 255, 0.08);
+  --t-close-bg-hover: rgba(255, 255, 255, 0.15);
+  --t-close-border: rgba(255, 255, 255, 0.15);
+  --t-close-color: rgba(255, 255, 255, 0.85);
+  --t-btn-bg: rgba(255, 255, 255, 0.08);
+  --t-btn-bg-hover: rgba(255, 255, 255, 0.14);
+  --t-btn-bg-active: rgba(255, 255, 255, 0.20);
+  --t-btn-border: rgba(255, 255, 255, 0.12);
+  --t-btn-color: rgba(255, 255, 255, 0.85);
+  --t-btn2-bg: rgba(255, 255, 255, 0.05);
+  --t-btn2-bg-hover: rgba(255, 255, 255, 0.10);
+  --t-btn2-border: rgba(255, 255, 255, 0.08);
+  --t-btn2-color: rgba(255, 255, 255, 0.65);
+  --t-progress-track: rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --glass-bg: var(--glass-bg-light);
+    --glass-reflex-light: 1;
+    --glass-reflex-dark: 1;
+    --t-text: rgba(0, 0, 0, 0.85);
+    --t-text-mid: rgba(0, 0, 0, 0.62);
+    --t-text-dim: rgba(0, 0, 0, 0.40);
+    --t-close-bg: rgba(0, 0, 0, 0.08);
+    --t-close-bg-hover: rgba(0, 0, 0, 0.15);
+    --t-close-border: rgba(0, 0, 0, 0.15);
+    --t-close-color: rgba(0, 0, 0, 0.85);
+    --t-btn-bg: rgba(0, 0, 0, 0.08);
+    --t-btn-bg-hover: rgba(0, 0, 0, 0.14);
+    --t-btn-bg-active: rgba(0, 0, 0, 0.20);
+    --t-btn-border: rgba(0, 0, 0, 0.12);
+    --t-btn-color: rgba(0, 0, 0, 0.85);
+    --t-btn2-bg: rgba(0, 0, 0, 0.05);
+    --t-btn2-bg-hover: rgba(0, 0, 0, 0.10);
+    --t-btn2-border: rgba(0, 0, 0, 0.08);
+    --t-btn2-color: rgba(0, 0, 0, 0.50);
+    --t-progress-track: rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* -- Per-card theme overrides (sender can force light/dark) -- */
+.notification-card.dark {
+  --glass-bg: var(--glass-bg-dark);
+  --glass-reflex-light: 0.3;
+  --glass-reflex-dark: 2;
+  --t-text: rgba(255, 255, 255, 0.85);
+  --t-text-mid: rgba(255, 255, 255, 0.62);
+  --t-text-dim: rgba(255, 255, 255, 0.40);
+  --t-close-bg: rgba(255, 255, 255, 0.08);
+  --t-close-bg-hover: rgba(255, 255, 255, 0.15);
+  --t-close-border: rgba(255, 255, 255, 0.15);
+  --t-close-color: rgba(255, 255, 255, 0.85);
+  --t-btn-bg: rgba(255, 255, 255, 0.08);
+  --t-btn-bg-hover: rgba(255, 255, 255, 0.14);
+  --t-btn-bg-active: rgba(255, 255, 255, 0.20);
+  --t-btn-border: rgba(255, 255, 255, 0.12);
+  --t-btn-color: rgba(255, 255, 255, 0.85);
+  --t-btn2-bg: rgba(255, 255, 255, 0.05);
+  --t-btn2-bg-hover: rgba(255, 255, 255, 0.10);
+  --t-btn2-border: rgba(255, 255, 255, 0.08);
+  --t-btn2-color: rgba(255, 255, 255, 0.65);
+  --t-progress-track: rgba(255, 255, 255, 0.08);
+}
+
+.notification-card.light {
+  --glass-bg: var(--glass-bg-light);
+  --glass-reflex-light: 1;
+  --glass-reflex-dark: 1;
+  --t-text: rgba(0, 0, 0, 0.85);
+  --t-text-mid: rgba(0, 0, 0, 0.62);
+  --t-text-dim: rgba(0, 0, 0, 0.40);
+  --t-close-bg: rgba(0, 0, 0, 0.08);
+  --t-close-bg-hover: rgba(0, 0, 0, 0.15);
+  --t-close-border: rgba(0, 0, 0, 0.15);
+  --t-close-color: rgba(0, 0, 0, 0.85);
+  --t-btn-bg: rgba(0, 0, 0, 0.08);
+  --t-btn-bg-hover: rgba(0, 0, 0, 0.14);
+  --t-btn-bg-active: rgba(0, 0, 0, 0.20);
+  --t-btn-border: rgba(0, 0, 0, 0.12);
+  --t-btn-color: rgba(0, 0, 0, 0.85);
+  --t-btn2-bg: rgba(0, 0, 0, 0.05);
+  --t-btn2-bg-hover: rgba(0, 0, 0, 0.10);
+  --t-btn2-border: rgba(0, 0, 0, 0.08);
+  --t-btn2-color: rgba(0, 0, 0, 0.50);
+  --t-progress-track: rgba(0, 0, 0, 0.08);
+}
+
+/* -- Overlay root -- */
 .overlay-root {
   width: 100%;
-  height: 100%;
   background: transparent;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   padding: 8px;
   box-sizing: border-box;
 }
 
-/* Stack container — fills the panel window */
+/* -- Notification stack -- */
 .notification-stack {
   display: flex;
   flex-direction: column;
@@ -17,119 +137,293 @@
   width: 100%;
 }
 
-/* Individual notification cards */
+/* ======================================================================
+   Notification Card — Liquid Glass
+   ====================================================================== */
 .notification-card {
-  background: rgba(22, 33, 62, 0.95);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 14px 16px;
-  box-shadow: var(--shadow-card);
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
-  animation: slide-in-right 300ms ease-out;
+  position: relative;
+  border-radius: var(--panel-radius);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"),
+    var(--glass-bg);
+  padding: 12px 14px;
+  padding-right: 32px; /* clearance for close button */
+  animation: slide-in-right 300ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* 9-layer reflex shadow stack (Meetily liquid glass) */
+  box-shadow:
+    /* light reflexes */
+    inset 0 0 0 1px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 12%), transparent),
+    inset 0 1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 70%), transparent),
+    inset 0 -1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 40%), transparent),
+    inset 0 -4px 8px -4px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 30%), transparent),
+    /* dark reflexes */
+    inset 0 -1px 4px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 8%), transparent),
+    inset 0 2px 4px -2px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 14%), transparent),
+    inset 0 -4px 6px -3px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 6%), transparent),
+    /* outer drop shadows */
+    0 1px 5px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 10%), transparent),
+    0 6px 16px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 8%), transparent);
+
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .notification-card:hover {
-  box-shadow: var(--shadow-hover);
   transform: translateX(-2px);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 16%), transparent),
+    inset 0 1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 80%), transparent),
+    inset 0 -1px 0 0 color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 50%), transparent),
+    inset 0 -4px 8px -4px color-mix(in srgb, #ffffff calc(var(--glass-reflex-light) * 40%), transparent),
+    inset 0 -1px 4px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 10%), transparent),
+    inset 0 2px 4px -2px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 18%), transparent),
+    inset 0 -4px 6px -3px color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 8%), transparent),
+    0 2px 8px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 14%), transparent),
+    0 8px 24px 0 color-mix(in srgb, #000000 calc(var(--glass-reflex-dark) * 12%), transparent);
 }
 
-/* Priority accent — left border */
+/* -- Priority accent — subtle top border glow -- */
 .notification-card.low {
-  border-left: 3px solid var(--color-low);
+  border-top: 0.5px solid var(--accent-low);
 }
 
 .notification-card.normal {
-  border-left: 3px solid var(--color-normal);
+  border-top: 0.5px solid var(--accent-normal);
 }
 
 .notification-card.high {
-  border-left: 3px solid var(--color-high);
+  border-top: 0.5px solid var(--accent-high);
 }
 
 .notification-card.critical {
-  border-left: 3px solid var(--color-critical);
-  background: rgba(40, 20, 30, 0.95);
+  border-top: 0.5px solid var(--accent-critical);
 }
 
-/* Header row */
-.notification-header {
+/* -- Critical pulsing glow (Meetily siri-style) -- */
+@property --pulse-opacity {
+  syntax: '<number>';
+  initial-value: 0.3;
+  inherits: false;
+}
+
+@keyframes glow-pulse {
+  0%   { --pulse-opacity: 0.25; }
+  50%  { --pulse-opacity: 0.9; }
+  100% { --pulse-opacity: 0.25; }
+}
+
+.notification-card.critical::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: calc(var(--panel-radius) + 1.5px);
+  background: rgba(255, 59, 48, var(--pulse-opacity));
+  animation: glow-pulse 2s ease-in-out infinite;
+  z-index: -1;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  padding: 1.5px;
+}
+
+.notification-card.critical::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(var(--panel-radius) + 4px);
+  background: rgba(255, 59, 48, calc(var(--pulse-opacity) * 0.45));
+  animation: glow-pulse 2s ease-in-out infinite;
+  z-index: -2;
+  filter: blur(8px);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  padding: 3px;
+}
+
+/* -- Dismiss animation -- */
+.notification-card.dismissing {
+  animation: slide-out-right 280ms cubic-bezier(0.55, 0, 1, 0.45) forwards;
+  pointer-events: none;
+}
+
+@keyframes slide-out-right {
+  to {
+    opacity: 0;
+    transform: translateX(60px) scale(0.95);
+  }
+}
+
+/* -- Content row (icon + text) -- */
+.notification-content-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
+  align-items: flex-start;
+  gap: 10px;
 }
 
-.notification-sender {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-dim);
-  letter-spacing: 0.3px;
-  text-transform: lowercase;
-}
-
-.notification-dismiss {
-  width: 22px;
-  height: 22px;
+.notification-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--t-close-bg);
+  border: 0.5px solid var(--t-close-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  font-size: 16px;
+  color: var(--t-text);
+  margin-top: 2px;
+}
+
+/* Priority-tinted icons */
+.notification-card.low .notification-icon {
+  background: rgba(46, 213, 115, 0.12);
+  color: var(--accent-low);
+  border-color: rgba(46, 213, 115, 0.20);
+}
+
+.notification-card.normal .notification-icon {
+  background: rgba(74, 158, 255, 0.12);
+  color: var(--accent-normal);
+  border-color: rgba(74, 158, 255, 0.20);
+}
+
+.notification-card.high .notification-icon {
+  background: rgba(255, 165, 2, 0.12);
+  color: var(--accent-high);
+  border-color: rgba(255, 165, 2, 0.20);
+}
+
+.notification-card.critical .notification-icon {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--accent-critical);
+  border-color: rgba(255, 59, 48, 0.25);
+}
+
+.notification-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* -- Header row -- */
+.notification-header {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 4px;
   line-height: 1;
-  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.notification-sender {
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-text-dim);
+}
+
+.notification-time {
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-dim);
+  margin-left: auto;
+  padding-right: 14px; /* keep clear of close button */
+  opacity: 0.8;
+}
+
+/* -- Close button (Meetily circular style, top-right absolute) -- */
+.notification-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: var(--close-size);
+  height: var(--close-size);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--t-close-bg);
+  border: 1px solid var(--t-close-border);
+  color: var(--t-close-color);
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 150ms ease, background 150ms ease;
+}
+
+.notification-card:hover .notification-dismiss {
+  opacity: 1;
 }
 
 .notification-dismiss:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-text);
+  background: var(--t-close-bg-hover);
 }
 
-/* Content */
+/* -- Content -- */
 .notification-title {
-  font-weight: 600;
   font-size: 14px;
-  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--t-text);
+  margin-bottom: 3px;
   line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notification-body {
   font-size: 13px;
-  color: var(--color-text-dim);
-  line-height: 1.45;
+  font-weight: 400;
+  color: var(--t-text-mid);
+  line-height: 1.5;
   word-break: break-word;
+  letter-spacing: 0.01em;
 }
 
-/* Progress bar */
+/* -- Progress bar -- */
 .notification-progress {
   margin-top: 10px;
 }
 
 .progress-bar,
 .progress-ring {
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  height: 3px;
+  background: var(--t-progress-track);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--color-accent);
+  background: var(--accent-normal);
   border-radius: 2px;
-  transition: width var(--transition-normal);
+  transition: width 250ms ease;
 }
 
 .progress-label {
   display: block;
   font-size: 11px;
-  color: var(--color-text-muted);
+  font-weight: 400;
+  color: var(--t-text-dim);
   margin-top: 4px;
 }
 
-/* Action buttons */
+/* -- Action buttons (Meetily glass style) -- */
 .notification-actions {
   display: flex;
   gap: 8px;
@@ -137,36 +431,103 @@
 }
 
 .action-button {
-  padding: 5px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
+  flex: 1;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--btn-radius);
+  font-size: 13px;
   font-weight: 500;
-  transition: background var(--transition-fast), opacity var(--transition-fast);
+  font-family: inherit;
+  border: 0.5px solid;
+  transition: background 150ms ease;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .action-button.primary {
-  background: var(--color-accent);
-  color: #fff;
+  background: var(--t-btn-bg);
+  border-color: var(--t-btn-border);
+  color: var(--t-btn-color);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
 }
 
 .action-button.primary:hover {
-  background: var(--color-accent-hover);
+  background: var(--t-btn-bg-hover);
+}
+
+.action-button.primary:active {
+  background: var(--t-btn-bg-active);
 }
 
 .action-button.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-text);
+  background: var(--t-btn2-bg);
+  border-color: var(--t-btn2-border);
+  color: var(--t-btn2-color);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
 }
 
 .action-button.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--t-btn2-bg-hover);
 }
 
 .action-button.danger {
-  background: var(--color-danger);
-  color: #fff;
+  background: #ff3b30;
+  border-color: rgba(0, 0, 0, 0.06);
+  color: white;
+  box-shadow: 0 1px 4px rgba(255, 59, 48, 0.3);
 }
 
 .action-button.danger:hover {
-  opacity: 0.85;
+  background: #e8342a;
+}
+
+.action-button.danger:active {
+  background: #d42e25;
+}
+
+/* -- Auto-dismiss countdown bar -- */
+.notification-countdown {
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.countdown-fill {
+  height: 100%;
+  border-radius: 1px;
+  background: var(--t-text-dim);
+  transform-origin: left;
+  animation: countdown-shrink var(--countdown-duration) linear forwards;
+}
+
+/* Priority-colored countdown */
+.notification-card.low .countdown-fill { background: var(--accent-low); opacity: 0.5; }
+.notification-card.normal .countdown-fill { background: var(--accent-normal); opacity: 0.5; }
+.notification-card.high .countdown-fill { background: var(--accent-high); opacity: 0.6; }
+.notification-card.critical .countdown-fill { background: var(--accent-critical); opacity: 0.7; }
+
+/* Pause countdown on hover */
+.notification-card:hover .countdown-fill {
+  animation-play-state: paused;
+}
+
+@keyframes countdown-shrink {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* -- Slide-in animation -- */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }

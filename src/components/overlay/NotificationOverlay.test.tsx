@@ -59,6 +59,7 @@ describe("NotificationOverlay", () => {
   });
 
   it("dismisses notification when dismiss button clicked", () => {
+    vi.useFakeTimers();
     useNotificationStore.getState().add(
       makeNotification({ id: "n1", title: "Dismissable" })
     );
@@ -66,9 +67,11 @@ describe("NotificationOverlay", () => {
     render(<NotificationOverlay />);
 
     fireEvent.click(screen.getByLabelText("Dismiss"));
+    act(() => { vi.advanceTimersByTime(300); });
 
     expect(screen.queryByText("Dismissable")).not.toBeInTheDocument();
     expect(useNotificationStore.getState().notifications).toHaveLength(0);
+    vi.useRealTimers();
   });
 
   it("subscribes to notification:add events", async () => {

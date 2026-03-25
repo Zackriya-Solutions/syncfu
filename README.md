@@ -7,9 +7,9 @@ syncfu is a standalone overlay notification system that sits between your backgr
 One HTTP call. One notification on your screen. That's it.
 
 ```bash
-curl -X POST localhost:9876/notify \
+curl -X POST localhost:9868/notify \
   -H "Content-Type: application/json" \
-  -d '{"sender":"claude","title":"Loop complete","body":"All 47 tests passing. PR ready for review."}'
+  -d '{"sender":"claude","title":"Loop complete","body":"All 47 tests passing.","icon":"check-circle","font":"Space Grotesk"}'
 ```
 
 Built with Tauri v2 + Rust + React. Cross-platform: macOS, Windows, Linux.
@@ -395,13 +395,14 @@ Open syncfu from the system tray or dock to see your notification history — ev
 | `sender` | string | yes | Identifier for the sending process |
 | `title` | string | yes | Notification title |
 | `body` | string | yes | Body text (supports markdown) |
-| `icon` | string | no | URL, file path, or base64 data URI |
+| `icon` | string | no | Lucide icon name (e.g. `phone`, `git-pull-request`, `bell`) |
+| `font` | string | no | Google Font name (e.g. `Space Grotesk`, `JetBrains Mono`) — loaded on demand |
 | `priority` | string | no | `low`, `normal` (default), `high`, `critical` |
-| `timeout` | object | no | `{"seconds": N}` or `"never"` or `"default"` (8s) |
+| `timeout` | object | no | `{"seconds": N}` or `"never"` or `"default"` (auto by priority) |
 | `actions` | array | no | Up to 3 action buttons |
 | `progress` | object | no | Progress bar (`bar` or `ring` style) |
 | `group` | string | no | Group key — notifications with same group stack together |
-| `theme` | string | no | CSS class name for custom styling |
+| `theme` | string | no | `light` or `dark` (auto-follows system by default) |
 | `sound` | string | no | `default`, `success`, `error`, or `none` |
 | `callback_url` | string | no | URL to POST when an action button is clicked |
 
@@ -585,18 +586,28 @@ Then use `"theme": "github-dark"` in your notification payload.
 ## Roadmap
 
 - [x] Architecture & plan
-- [ ] Core overlay window + system tray
-- [ ] Notification rendering + animations
+- [x] Core overlay window + system tray
+- [x] NSPanel on macOS (non-activating, joins all Spaces)
+- [x] Notification rendering + Liquid Glass design
+- [x] HTTP REST server (port 9868)
+- [x] Light/dark theme (auto + per-notification override)
+- [x] Lucide icons (programmable via `icon` field)
+- [x] Google Fonts (programmable via `font` field)
+- [x] Slide-in/slide-out animations
+- [x] Auto-dismiss with countdown bar (pauses on hover)
+- [x] Critical pulsing glow (Siri-style)
+- [x] Relative timestamps ("just now", "5m ago")
+- [x] Priority-tinted icon containers
+- [x] Dynamic panel resize (no click-blocking)
+- [x] 112 tests (67 frontend + 45 Rust)
 - [ ] Click-through mechanism
-- [ ] HTTP + WebSocket servers
+- [ ] WebSocket server (port 9869)
 - [ ] CLI tool
-- [ ] Action buttons + callbacks
-- [ ] Progress bars
+- [ ] Action button callbacks
 - [ ] Markdown body rendering
 - [ ] Notification grouping
 - [ ] Sound playback
 - [ ] SQLite history
-- [ ] Custom themes
 - [ ] Multi-monitor support
 - [ ] Linux Wayland support
 - [ ] Plugin SDK (custom notification templates)

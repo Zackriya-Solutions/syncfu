@@ -97,6 +97,7 @@ describe("NotificationCard", () => {
   });
 
   it("calls onDismiss when dismiss button clicked", () => {
+    vi.useFakeTimers();
     const onDismiss = vi.fn();
 
     render(
@@ -108,7 +109,9 @@ describe("NotificationCard", () => {
     );
 
     fireEvent.click(screen.getByLabelText("Dismiss"));
+    vi.advanceTimersByTime(300);
     expect(onDismiss).toHaveBeenCalledWith("test-1");
+    vi.useRealTimers();
   });
 
   it("renders progress bar when progress is provided", () => {
