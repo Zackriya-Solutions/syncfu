@@ -1,4 +1,5 @@
 pub mod notification;
+pub mod tray;
 
 use std::sync::Arc;
 
@@ -96,7 +97,20 @@ pub fn run() {
             health,
         ])
         .setup(|app| {
-            // Create overlay window
+            // Set up system tray
+            tray::menu::setup_tray(app.handle())
+                .expect("failed to set up system tray");
+
+            // Get primary monitor dimensions for overlay sizing
+            let (width, height) = match app.primary_monitor() {
+                Ok(Some(monitor)) => {
+                    let size = monitor.size();
+                    (size.width as f64, size.height as f64)
+                }
+                _ => (1920.0, 1080.0), // fallback
+            };
+
+            // Create overlay window — fullscreen, transparent, always on top
             let _overlay = tauri::WebviewWindowBuilder::new(
                 app,
                 "overlay",
@@ -110,6 +124,8 @@ pub fn run() {
             .focused(false)
             .resizable(false)
             .visible(true)
+            .inner_size(width, height)
+            .position(0.0, 0.0)
             .title("syncfu overlay")
             .build()
             .expect("failed to create overlay window");
