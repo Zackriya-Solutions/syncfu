@@ -1,16 +1,18 @@
 import { useEffect, useRef, useCallback } from "react";
 import { window as tauriWindow } from "@tauri-apps/api";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationCard } from "./NotificationCard";
+
+const PANEL_WIDTH = 400;
 
 /** Resize the overlay window to fit only the notification content. */
 function resizeToContent(el: HTMLElement | null) {
   if (!el) return;
-  const win = tauriWindow.getCurrentWindow();
-  // Measure actual content height + small padding
   const height = el.scrollHeight + 4;
-  const width = 400;
-  win.setSize(new tauriWindow.LogicalSize(width, Math.max(height, 10)));
+  getCurrentWindow()
+    .setSize(new LogicalSize(PANEL_WIDTH, Math.max(height, 10)))
+    .catch(() => {});
 }
 
 export function NotificationOverlay() {
@@ -25,9 +27,8 @@ export function NotificationOverlay() {
 
   // Hide panel when empty, resize to fit content when not
   useEffect(() => {
-    const win = tauriWindow.getCurrentWindow();
     if (notifications.length === 0) {
-      win.hide();
+      getCurrentWindow().hide();
     } else {
       // Small delay to let React render the cards before measuring
       requestAnimationFrame(() => resizeToContent(rootRef.current));

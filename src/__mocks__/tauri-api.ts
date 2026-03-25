@@ -38,9 +38,13 @@ const mockCurrentWindow = {
   onCloseRequested: vi.fn(() => Promise.resolve(() => {})),
 };
 
+export const LogicalSize = vi.fn((width: number, height: number) => ({ width, height, type: "Logical" }));
+
+export const getCurrentWindow = vi.fn(() => mockCurrentWindow);
+
 export const window = {
   getCurrentWindow: vi.fn(() => mockCurrentWindow),
-  LogicalSize: vi.fn((width: number, height: number) => ({ width, height, type: "Logical" })),
+  LogicalSize,
   Window: {
     getByLabel: vi.fn((_label: string) => null),
   },
