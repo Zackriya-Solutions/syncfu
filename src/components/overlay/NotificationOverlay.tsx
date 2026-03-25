@@ -6,6 +6,12 @@ import { NotificationCard } from "./NotificationCard";
 export function NotificationOverlay() {
   const { notifications, dismiss } = useNotifications();
 
+  // Set transparent background on the overlay window (not the main app)
+  useEffect(() => {
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+  }, []);
+
   // Hide the panel window when all notifications are dismissed
   useEffect(() => {
     if (notifications.length === 0) {
