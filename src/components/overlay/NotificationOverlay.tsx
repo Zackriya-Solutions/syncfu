@@ -5,10 +5,8 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationCard } from "./NotificationCard";
 
 const PANEL_WIDTH = 400;
-/** Height reserved per stacked card behind the front one (px) */
+/** Peek offset per stacked card — must match NotificationCard.STACK_PEEK_PX */
 const STACK_PEEK = 8;
-/** Gap between cards when expanded */
-const EXPANDED_GAP = 10;
 
 /** Resize the overlay window to fit only the notification content. */
 function resizeToContent(el: HTMLElement | null, expanded: boolean, count: number) {
@@ -93,16 +91,9 @@ export function NotificationOverlay() {
         <div
           data-testid="notification-stack"
           className="notification-stack"
-          data-expanded={expanded}
+          data-expanded={expanded ? "true" : "false"}
           onMouseEnter={() => setExpanded(true)}
           onMouseLeave={() => setExpanded(false)}
-          style={
-            {
-              "--stack-count": notifications.length,
-              "--expanded-gap": `${EXPANDED_GAP}px`,
-              "--stack-peek": `${STACK_PEEK}px`,
-            } as React.CSSProperties
-          }
         >
           {notifications.map((notification, index) => (
             <NotificationCard
@@ -110,6 +101,7 @@ export function NotificationOverlay() {
               notification={notification}
               index={index}
               total={notifications.length}
+              expanded={expanded}
               onDismiss={dismiss}
               onAction={handleAction}
             />

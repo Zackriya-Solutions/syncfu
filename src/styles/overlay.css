@@ -135,45 +135,11 @@
   width: 100%;
 }
 
-/* Collapsed: cards overlap behind the front one */
-.notification-stack[data-expanded="false"] .notification-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  transform:
-    translateY(calc(var(--index) * var(--stack-peek)))
-    scale(calc(1 - var(--index) * 0.05));
-  transform-origin: top center;
-  z-index: calc(var(--total) - var(--index));
-  opacity: calc(1 - var(--index) * 0.15);
-  transition: transform 400ms ease, opacity 400ms ease;
-}
-
-/* Front card in collapsed mode — keep first child in flow for height */
-.notification-stack[data-expanded="false"] .notification-card:first-child {
-  position: relative;
-}
-
-/* Hide cards beyond 3rd in collapsed stack */
-.notification-stack[data-expanded="false"] .notification-card:nth-child(n+4) {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* Expanded: normal vertical flow with gaps */
+/* Expanded: vertical flow with gaps */
 .notification-stack[data-expanded="true"] {
   display: flex;
   flex-direction: column;
-  gap: var(--expanded-gap);
-}
-
-.notification-stack[data-expanded="true"] .notification-card {
-  position: relative;
-  transform: none;
-  opacity: 1;
-  z-index: auto;
-  transition: transform 400ms ease, opacity 400ms ease;
+  gap: 10px;
 }
 
 /* ======================================================================
@@ -187,7 +153,6 @@
   background: var(--s-card-bg, var(--glass-bg));
   padding: 12px 14px;
   padding-right: 32px; /* clearance for close button */
-  animation: slide-in-right 300ms cubic-bezier(0.16, 1, 0.3, 1);
   border: none;
   outline: none;
   box-shadow: none;

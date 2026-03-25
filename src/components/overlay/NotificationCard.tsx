@@ -18,14 +18,25 @@ interface NotificationCardProps {
   readonly notification: NotificationPayload;
   readonly index?: number;
   readonly total?: number;
+  readonly expanded?: boolean;
   readonly onDismiss: (id: string) => void;
   readonly onAction: (notificationId: string, actionId: string) => void;
 }
+
+/** Max visible cards in collapsed stack */
+const MAX_STACK_VISIBLE = 3;
+/** Peek offset per stacked card (px) */
+const STACK_PEEK_PX = 8;
+/** Scale reduction per stacked card */
+const STACK_SCALE_STEP = 0.05;
+/** Opacity reduction per stacked card */
+const STACK_OPACITY_STEP = 0.15;
 
 export function NotificationCard({
   notification,
   index = 0,
   total = 1,
+  expanded = true,
   onDismiss,
   onAction,
 }: NotificationCardProps) {
@@ -34,11 +45,51 @@ export function NotificationCard({
 
   useGoogleFont(font);
 
-  // Build CSS custom properties from style overrides + stack index
-  const styleVars = useMemo(
-    () => ({ ...buildStyleVars(style, font), "--index": index, "--total": total } as React.CSSProperties),
-    [style, font, index, total],
-  );
+  // Build CSS custom properties from style overrides + stacking inline styles
+  const styleVars = useMemo(() => {
+    const vars = buildStyleVars(style, font);
+
+    if (!expanded && index > 0) {
+      const scale = 1 - index * STACK_SCALE_STEP;
+      const translateY = index * STACK_PEEK_PX;
+      const opacity = Math.max(0, 1 - index * STACK_OPACITY_STEP);
+      const hidden = index >= MAX_STACK_VISIBLE;
+
+      return {
+        ...vars,
+        position: "absolute" as const,
+        top: 0,
+        left: 0,
+        right: 0,
+        transform: `translateY(${translateY}px) scale(${scale})`,
+        transformOrigin: "top center",
+        zIndex: total - index,
+        opacity: hidden ? 0 : opacity,
+        pointerEvents: hidden ? ("none" as const) : ("auto" as const),
+        transition: "transform 400ms ease, opacity 400ms ease",
+        animation: "none",
+      };
+    }
+
+    if (!expanded && index === 0) {
+      return {
+        ...vars,
+        position: "relative" as const,
+        zIndex: total,
+        transition: "transform 400ms ease, opacity 400ms ease",
+      };
+    }
+
+    // Expanded: normal flow
+    return {
+      ...vars,
+      position: "relative" as const,
+      transform: "none",
+      opacity: 1,
+      zIndex: "auto" as const,
+      transition: "transform 400ms ease, opacity 400ms ease",
+    };
+  }, [style, font, index, total, expanded]);
   const [dismissing, setDismissing] = useState(false);
   const hovering = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
