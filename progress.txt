@@ -43,7 +43,12 @@ User context: ADHD — needs push-based notifications, doesn't go back to read t
 - [x] Tauri v2 capabilities JSON — permissions for events, windows, dialog, autostart
 - [x] test_notify command — sends a sample notification for dev testing
 - [x] macOS dock reopen handler — re-shows/creates main window on dock click
-- [x] cargo check passes, cargo test passes (27 tests)
+- [x] server/http.rs — axum HTTP server on port 9876
+  - POST /notify, /notify/{id}/update, /notify/{id}/dismiss, /dismiss-all
+  - GET /health, /active
+  - CORS permissive, emits Tauri events to frontend
+  - 11 integration tests (all endpoints, 404s, default priority, active count)
+- [x] cargo check passes, cargo test passes (38 tests)
 
 ### Frontend
 - [x] types/notification.ts — mirrors Rust types
@@ -79,6 +84,7 @@ User context: ADHD — needs push-based notifications, doesn't go back to read t
 - [x] 1315c31 — feat: load tray icon from bundled PNG
 - [x] 90773b4 — feat: add test_notify command and macOS dock reopen handler
 - [x] 657a943 — refactor: extract useNotifications hook from overlay component
+- [x] b78ab0b — feat: add axum HTTP server on port 9876
 
 # TODO LIST
 
@@ -104,9 +110,9 @@ User context: ADHD — needs push-based notifications, doesn't go back to read t
 - [ ] Platform-specific dependencies (core-graphics, windows crate, x11 crate)
 
 ## Phase 4: HTTP + WebSocket Servers
-- [ ] axum HTTP server (POST /notify, /notify/{id}/update, /notify/{id}/dismiss, /dismiss-all, GET /health, /history)
-- [ ] tokio-tungstenite WebSocket server (bidirectional protocol)
-- [ ] Share Arc<NotificationManager> between servers and Tauri
+- [x] axum HTTP server on port 9876 — all REST endpoints implemented and tested
+- [ ] tokio-tungstenite WebSocket server on port 9877 (bidirectional protocol)
+- [x] Share Arc<NotificationManager> between HTTP server and Tauri
 - [ ] CLI binary (cli/Cargo.toml, clap + reqwest)
 
 ## Phase 5: Rich Features
@@ -134,7 +140,7 @@ User context: ADHD — needs push-based notifications, doesn't go back to read t
 Phase 1 nearly complete. All code compiles and tests pass (81 total: 54 frontend + 27 Rust, 97.43% coverage).
 Capabilities, tray menu, CSS styles, overlay event subscriptions, test_notify command, dock reopen all done.
 Blocker: run `pnpm approve-builds` interactively to approve esbuild, then `cargo tauri dev` for first launch.
-Next step: Phase 3 click-through, or Phase 4 HTTP/WS servers. Run `pnpm approve-builds` interactively then `cargo tauri dev` to validate.
+Next step: WebSocket server (Phase 4), then CLI binary. Or Phase 3 click-through. Run `pnpm approve-builds` interactively then `cargo tauri dev` to validate UI.
 
 # OBSERVATIONS & DECISIONS
 - Using single index.html for both windows — frontend reads window label to decide overlay vs main app
