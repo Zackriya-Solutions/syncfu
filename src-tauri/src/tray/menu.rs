@@ -31,7 +31,11 @@ pub fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri:
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu = build_tray_menu(app)?;
 
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../../icons/32x32.png"))
+        .expect("failed to load tray icon");
+
     let _tray = TrayIconBuilder::new()
+        .icon(icon)
         .menu(&menu)
         .tooltip("syncfu — notification overlay")
         .on_menu_event(move |app, event| {
