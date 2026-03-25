@@ -27,8 +27,10 @@ tauri_nspanel::tauri_panel! {
 }
 
 /// Panel dimensions in logical pixels.
+/// Width matches the notification card max-width.
+/// Height starts minimal — frontend resizes dynamically to fit content.
 pub const PANEL_WIDTH: f64 = 400.0;
-pub const PANEL_MAX_HEIGHT: f64 = 620.0;
+pub const PANEL_INITIAL_HEIGHT: f64 = 10.0;
 
 /// Margin from the top-right corner of the work area.
 pub const MARGIN_TOP: f64 = 12.0;
@@ -82,7 +84,7 @@ pub fn create_panel(app: &AppHandle) -> Result<(), String> {
 
     info!(
         "Creating notification panel at ({}, {}), size {}x{}",
-        position.x, position.y, PANEL_WIDTH, PANEL_MAX_HEIGHT
+        position.x, position.y, PANEL_WIDTH, PANEL_INITIAL_HEIGHT
     );
 
     #[cfg(target_os = "macos")]
@@ -120,7 +122,7 @@ fn create_macos_panel(
         )
         .has_shadow(true)
         .transparent(true)
-        .size(tauri::Size::Logical(tauri::LogicalSize::new(PANEL_WIDTH, PANEL_MAX_HEIGHT)))
+        .size(tauri::Size::Logical(tauri::LogicalSize::new(PANEL_WIDTH, PANEL_INITIAL_HEIGHT)))
         .position(tauri::Position::Logical(tauri::LogicalPosition::new(position.x, position.y)))
         .with_window(|builder| {
             builder
@@ -163,7 +165,7 @@ fn create_standard_panel(
     .focused(false)
     .resizable(false)
     .visible(false)
-    .inner_size(PANEL_WIDTH, PANEL_MAX_HEIGHT)
+    .inner_size(PANEL_WIDTH, PANEL_INITIAL_HEIGHT)
     .position(position.x, position.y)
     .title("syncfu overlay")
     .build()
@@ -343,8 +345,8 @@ mod tests {
     fn test_panel_dimensions_are_reasonable() {
         assert!(PANEL_WIDTH > 300.0, "Panel too narrow for notifications");
         assert!(PANEL_WIDTH < 500.0, "Panel too wide");
-        assert!(PANEL_MAX_HEIGHT > 400.0, "Panel too short for 5 cards");
-        assert!(PANEL_MAX_HEIGHT < 800.0, "Panel too tall");
+        // Initial height is minimal — frontend resizes dynamically
+        assert!(PANEL_INITIAL_HEIGHT <= 20.0, "Initial height should be tiny");
     }
 
     #[test]
