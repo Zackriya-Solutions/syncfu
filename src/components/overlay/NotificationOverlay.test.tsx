@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act, waitFor } from "@testing-library/react"
 import { NotificationOverlay } from "./NotificationOverlay";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { event as tauriEvent, window as tauriWindow } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { emitMockEvent } from "@/__mocks__/tauri-api";
 import type { NotificationPayload } from "@/types/notification";
 
@@ -197,6 +198,27 @@ describe("NotificationOverlay", () => {
 
     await waitFor(() => {
       expect(hideMock).toHaveBeenCalled();
+    });
+  });
+
+  it("invokes action_callback when action button clicked", () => {
+    useNotificationStore.getState().add(
+      makeNotification({
+        id: "n1",
+        title: "With Actions",
+        actions: [
+          { id: "approve", label: "Approve", style: "primary" },
+        ],
+      })
+    );
+
+    render(<NotificationOverlay />);
+
+    fireEvent.click(screen.getByText("Approve"));
+
+    expect(invoke).toHaveBeenCalledWith("action_callback", {
+      notificationId: "n1",
+      actionId: "approve",
     });
   });
 

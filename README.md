@@ -363,6 +363,7 @@ Open syncfu from the system tray or dock to see your notification history — ev
 |--------|------|-------------|
 | `POST` | `/notify` | Send a notification |
 | `POST` | `/notify/{id}/update` | Update an existing notification (progress, body) |
+| `POST` | `/notify/{id}/action` | Trigger an action (fires webhook to `callbackUrl`, dismisses) |
 | `POST` | `/notify/{id}/dismiss` | Dismiss a specific notification |
 | `POST` | `/dismiss-all` | Dismiss all active notifications |
 | `GET` | `/health` | Server status and active notification count |
@@ -599,11 +600,11 @@ Then use `"theme": "github-dark"` in your notification payload.
 - [x] Relative timestamps ("just now", "5m ago")
 - [x] Priority-tinted icon containers
 - [x] Dynamic panel resize (no click-blocking)
-- [x] 112 tests (67 frontend + 45 Rust)
+- [x] 119 tests (68 frontend + 51 Rust)
+- [x] Webhook callbacks (action buttons POST to `callbackUrl`)
 - [ ] Click-through mechanism
 - [ ] WebSocket server (port 9869)
 - [ ] CLI tool
-- [ ] Action button callbacks
 - [ ] Markdown body rendering
 - [ ] Notification grouping
 - [ ] Sound playback

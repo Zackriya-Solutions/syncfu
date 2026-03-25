@@ -14,6 +14,7 @@ use crate::notification::manager::NotificationManager;
 use crate::notification::types::{
     Action, NotificationPayload, NotificationUpdate, Priority, ProgressInfo, Timeout,
 };
+use crate::server::webhook::{self, WebhookPayload, WebhookResult};
 
 /// Shared state for the HTTP server.
 #[derive(Clone)]
@@ -80,11 +81,18 @@ pub struct UpdateRequest {
     pub progress: Option<ProgressInfo>,
 }
 
+/// Incoming action request — triggers webhook callback
+#[derive(Debug, Deserialize)]
+pub struct ActionRequest {
+    pub action_id: String,
+}
+
 /// Build the axum router.
 pub fn build_router(state: ServerState) -> Router {
     Router::new()
         .route("/notify", post(handle_notify))
         .route("/notify/{id}/update", post(handle_update))
+        .route("/notify/{id}/action", post(handle_action))
         .route("/notify/{id}/dismiss", post(handle_dismiss))
         .route("/dismiss-all", post(handle_dismiss_all))
         .route("/health", get(handle_health))
@@ -167,6 +175,53 @@ async fn handle_update(
         warn!("Update failed — notification not found: id={id}");
         StatusCode::NOT_FOUND
     }
+}
+
+async fn handle_action(
+    State(state): State<ServerState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(req): Json<ActionRequest>,
+) -> Result<Json<WebhookResult>, StatusCode> {
+    debug!("Action request for id={id} action={}", req.action_id);
+
+    let notification = state
+        .manager
+        .get(&id)
+        .await
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let result = if let Some(ref url) = notification.callback_url {
+        let payload = WebhookPayload {
+            notification_id: id.clone(),
+            action_id: req.action_id.clone(),
+            sender: notification.sender.clone(),
+            title: notification.title.clone(),
+        };
+        webhook::fire_webhook(url, &payload).await
+    } else {
+        WebhookResult {
+            success: true,
+            status_code: None,
+            error: None,
+        }
+    };
+
+    // Dismiss after action
+    let dismissed = state.manager.dismiss(&id).await;
+    if dismissed.is_some() {
+        if let Some(ref app) = state.app_handle {
+            let _ = tauri::Emitter::emit(app, "notification:dismiss", &id);
+            if state.manager.active_count().await == 0 {
+                crate::overlay::panel::hide_panel(app);
+            }
+        }
+    }
+
+    info!(
+        "Action completed: id={id} action={} webhook_success={}",
+        req.action_id, result.success
+    );
+    Ok(Json(result))
 }
 
 async fn handle_dismiss(
@@ -584,6 +639,89 @@ mod tests {
             .unwrap();
         let health: HealthResponse = serde_json::from_slice(&body).unwrap();
         assert_eq!(health.active_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_action_dismisses_notification() {
+        let state = test_state();
+        let payload = NotificationPayload {
+            id: "action-test".to_string(),
+            sender: "ci".to_string(),
+            title: "Build".to_string(),
+            body: "Done".to_string(),
+            icon: None,
+            priority: Priority::Normal,
+            timeout: Timeout::default(),
+            actions: vec![Action {
+                id: "approve".to_string(),
+                label: "Approve".to_string(),
+                style: crate::notification::types::ActionStyle::Primary,
+            }],
+            progress: None,
+            group: None,
+            theme: None,
+            sound: None,
+            callback_url: None,
+            created_at: chrono::Utc::now(),
+        };
+        state.manager.add(payload).await;
+        assert_eq!(state.manager.active_count().await, 1);
+
+        let app = build_router(state.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/notify/action-test/action")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::to_string(&serde_json::json!({
+                            "action_id": "approve"
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let result: WebhookResult = serde_json::from_slice(&body).unwrap();
+        // No callback_url, so success=true with no status_code
+        assert!(result.success);
+        assert!(result.status_code.is_none());
+
+        // Notification should be dismissed
+        assert_eq!(state.manager.active_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_action_nonexistent_returns_404() {
+        let app = build_router(test_state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/notify/nonexistent/action")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::to_string(&serde_json::json!({
+                            "action_id": "click"
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

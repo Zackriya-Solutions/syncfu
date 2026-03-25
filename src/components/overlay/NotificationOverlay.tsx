@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationCard } from "./NotificationCard";
 
@@ -50,8 +51,13 @@ export function NotificationOverlay() {
   }, [notifications.length]);
 
   const handleAction = useCallback(
-    (_notificationId: string, _actionId: string) => {
-      // TODO: send action callback via Tauri command
+    (notificationId: string, actionId: string) => {
+      invoke("action_callback", {
+        notificationId,
+        actionId,
+      }).catch((err) =>
+        console.error("[syncfu] action_callback failed:", err)
+      );
     },
     []
   );

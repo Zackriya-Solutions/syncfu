@@ -26,19 +26,20 @@ User context: ADHD — needs push-based notifications, doesn't go back to read t
 - [x] notification/manager.rs — NotificationManager with add/dismiss/update/dismissAll/list (11 tests)
 - [x] lib.rs — Tauri commands, overlay panel creation in setup(), panic hook, main thread dispatch
 - [x] tray/menu.rs — System tray with Open, Clear All, Pause, Quit (6 tests)
-- [x] server/http.rs — axum HTTP server on port 9868 (11 tests)
+- [x] server/http.rs — axum HTTP server on port 9868 (13 tests, includes action endpoint)
+- [x] server/webhook.rs — webhook callback client, 5s timeout, camelCase payloads (4 tests)
 - [x] overlay/panel.rs — NSPanel (macOS) / WebviewWindow (Windows) with position calc (7 tests)
 - [x] tauri-nspanel integration — non-activating, joins all Spaces, proper z-order
 - [x] Main thread dispatch for all panel show/hide ops (prevents AppKit crashes from tokio threads)
 - [x] Dynamic panel sizing — starts 10px, frontend resizes to fit content
-- [x] cargo check passes, cargo test passes (45 tests)
+- [x] cargo check passes, cargo test passes (51 tests)
 
 ### Frontend
 - [x] types/notification.ts — mirrors Rust types + icon, font fields
 - [x] stores/notificationStore.ts — Zustand store (13 tests)
 - [x] stores/historyStore.ts — Zustand store (13 tests)
 - [x] App.tsx — multi-window router (2 tests)
-- [x] components/overlay/NotificationOverlay.tsx — transparent container, Tauri events, dynamic resize (15 tests)
+- [x] components/overlay/NotificationOverlay.tsx — transparent container, Tauri events, dynamic resize, action callbacks (16 tests)
 - [x] components/overlay/NotificationCard.tsx — glass card with icons, fonts, countdown, dismiss animation (9 tests)
 - [x] components/overlay/NotificationIcon.tsx — dynamic Lucide icon by name (kebab/pascal/lowercase)
 - [x] components/overlay/RelativeTime.tsx — "just now" / "5m ago" / "1h ago" with smart tick intervals
@@ -46,7 +47,7 @@ User context: ADHD — needs push-based notifications, doesn't go back to read t
 - [x] hooks/useGoogleFont.ts — dynamically loads Google Fonts via <link> injection, deduplicates
 - [x] components/app/MainApp.tsx, HistoryView.tsx (4 tests)
 - [x] __mocks__/ — Tauri API, autostart, dialog mocks
-- [x] pnpm test passes (67 tests)
+- [x] pnpm test passes (68 tests)
 
 ### Overlay Design: Liquid Glass (Meetily-inspired)
 - [x] 9-layer reflex shadow stack (4 light + 3 dark + 2 drop shadows)
@@ -73,6 +74,7 @@ User context: ADHD — needs push-based notifications, doesn't go back to read t
 - [x] scripts/fire.py — comprehensive test notification sender
   - --all (each priority with icons), --burst N, --progress, --actions, --critical
   - --icons (5 different icon types), --fonts (4 different Google Fonts)
+  - --webhook (starts listener on :9870, sends notification with callback_url)
 
 ### Git history (this phase)
 297c06c fix: start panel at 10px height, frontend resizes to fit content
@@ -89,27 +91,16 @@ d783e99 refactor: replace fullscreen overlay with positioned panel window
 
 # TODO LIST
 
-## Uncommitted — Current Session Work
-- [x] Fix panel click-blocking (removed height:100%, measure stack offsetHeight)
-- [x] Liquid Glass design overhaul (Meetily-inspired)
-- [x] Light/dark theme support
-- [x] Lucide icons support
-- [x] Google Fonts support
-- [x] Dismiss animation (slide-out-right)
-- [x] Critical pulsing glow
-- [x] Auto-dismiss countdown bar
-- [x] Relative timestamps
-- [x] Priority-tinted icons
-- [x] Design review refinements (mono fonts, body opacity, button weight, grain texture)
-- [ ] Commit all changes
-
 ## Phase 3: Click-Through — NOT STARTED
 - [ ] CSS pointer-events: none on overlay body, auto on cards
 - [ ] Rust-side mouse position polling (macOS: CGEvent, Windows: GetCursorPos)
 - [ ] setIgnoreCursorEvents toggle logic
 
 ## Phase 4 Remaining: WebSocket + CLI
-- [x] axum HTTP server on port 9868 — all REST endpoints (11 tests)
+- [x] axum HTTP server on port 9868 — all REST endpoints (13 tests)
+- [x] Webhook callbacks: POST /notify/{id}/action fires to callback_url, dismisses notification
+- [x] action_callback Tauri command: frontend action buttons → webhook + dismiss
+- [x] fire.py --webhook test mode: starts listener on :9870, verified end-to-end
 - [ ] tokio-tungstenite WebSocket server on port 9869
 - [ ] CLI binary (cli/Cargo.toml, clap + reqwest)
 
@@ -119,7 +110,7 @@ d783e99 refactor: replace fullscreen overlay with positioned panel window
 - [ ] Live preview, Send button, Copy curl, Quick templates
 
 ## Phase 5: Rich Features
-- [ ] Action buttons + callback dispatch (POST to callback_url)
+- [x] Action buttons + callback dispatch (POST to callback_url) — DONE
 - [ ] Markdown body rendering (react-markdown)
 - [ ] Notification grouping (collapse/expand)
 - [ ] Sound playback (rodio)
@@ -138,9 +129,10 @@ d783e99 refactor: replace fullscreen overlay with positioned panel window
 - Transparency + dynamic resize need visual verification after Rust rebuild
 
 # CURRENT STATUS
-112 tests passing (67 frontend + 45 Rust). Overlay is fully functional with Liquid Glass design,
-Lucide icons, Google Fonts, auto-dismiss, critical glow, dismiss animations, and relative timestamps.
-All work this session is uncommitted. Next: commit, then WebSocket server or Test UI.
+119 tests passing (68 frontend + 51 Rust). Overlay is fully functional with Liquid Glass design,
+Lucide icons, Google Fonts, auto-dismiss, critical glow, dismiss animations, relative timestamps,
+and webhook callbacks. Action buttons fire HTTP POST to callback_url and dismiss the notification.
+Next: WebSocket server, CLI, or Test UI.
 
 # OBSERVATIONS & DECISIONS
 - NSPanel is the correct primitive for macOS floating utility panels (non-activating, joins all Spaces)

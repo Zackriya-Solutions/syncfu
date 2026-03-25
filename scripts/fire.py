@@ -10,6 +10,7 @@ Usage:
     python3 scripts/fire.py --critical       # send a critical notification
     python3 scripts/fire.py --icons          # send notifications with various icons
     python3 scripts/fire.py --fonts          # send notifications with custom Google Fonts
+    python3 scripts/fire.py --webhook        # send notification with callback_url (starts listener)
 """
 
 import json
@@ -109,6 +110,51 @@ def main():
         send({"sender": "mail", "title": "New Email", "body": "Invoice from AWS", "icon": "mail"})
         send({"sender": "deploy", "title": "Deploy Complete", "body": "v2.1.0 is live", "icon": "rocket", "priority": "low"})
         send({"sender": "security", "title": "Login Attempt", "body": "New sign-in from Tokyo", "icon": "shield-alert", "priority": "high"})
+
+    elif mode == "--webhook":
+        print("Starting callback listener on :9870 and sending notification with callback_url...")
+        import http.server
+        import threading
+
+        class CallbackHandler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length).decode() if length else ""
+                print(f"\n  WEBHOOK RECEIVED:")
+                print(f"  {json.dumps(json.loads(body), indent=2)}")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"ok":true}')
+
+            def log_message(self, format, *args):
+                pass  # suppress default logging
+
+        server = http.server.HTTPServer(("127.0.0.1", 9870), CallbackHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        print("  Callback listener running on http://127.0.0.1:9870/callback")
+
+        send({
+            "sender": "webhook-test",
+            "title": "Click an action!",
+            "body": "Clicking Approve or Reject will fire a webhook to :9870",
+            "priority": "high",
+            "icon": "webhook",
+            "actions": [
+                {"id": "approve", "label": "Approve", "style": "primary"},
+                {"id": "reject", "label": "Reject", "style": "danger"},
+            ],
+            "callback_url": "http://127.0.0.1:9870/callback",
+        })
+
+        print("\n  Waiting for webhook callback (Ctrl+C to stop)...")
+        try:
+            thread.join()
+        except KeyboardInterrupt:
+            server.shutdown()
+            print("\n  Listener stopped.")
+        return
 
     elif mode == "--fonts":
         print("Sending notifications with custom Google Fonts:")

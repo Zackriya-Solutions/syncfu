@@ -8,6 +8,7 @@ use std::sync::Arc;
 use log::{error, info};
 use notification::manager::NotificationManager;
 use notification::types::{NotificationPayload, NotificationUpdate, Priority, Timeout};
+use server::webhook::{self, WebhookPayload, WebhookResult};
 use server::http::ServerState;
 use tauri::{Emitter, Manager};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
@@ -92,6 +93,50 @@ async fn health(
         "status": "ok",
         "activeCount": manager.active_count().await,
     }))
+}
+
+/// Fire webhook callback when a user clicks an action button on a notification.
+/// Looks up the notification's callback_url, POSTs action details, then dismisses.
+#[tauri::command]
+async fn action_callback(
+    manager: tauri::State<'_, Arc<NotificationManager>>,
+    notification_id: String,
+    action_id: String,
+    app: tauri::AppHandle,
+) -> Result<WebhookResult, String> {
+    let notification = manager
+        .get(&notification_id)
+        .await
+        .ok_or_else(|| format!("Notification not found: {notification_id}"))?;
+
+    let result = if let Some(ref url) = notification.callback_url {
+        let payload = WebhookPayload {
+            notification_id: notification_id.clone(),
+            action_id: action_id.clone(),
+            sender: notification.sender.clone(),
+            title: notification.title.clone(),
+        };
+        webhook::fire_webhook(url, &payload).await
+    } else {
+        info!("No callback_url for notification={notification_id}, action={action_id} — skipping webhook");
+        WebhookResult {
+            success: true,
+            status_code: None,
+            error: None,
+        }
+    };
+
+    // Dismiss after action regardless of webhook result
+    let dismissed = manager.dismiss(&notification_id).await;
+    if dismissed.is_some() {
+        app.emit("notification:dismiss", &notification_id)
+            .map_err(|e| e.to_string())?;
+        if manager.active_count().await == 0 {
+            overlay::panel::hide_panel(&app);
+        }
+    }
+
+    Ok(result)
 }
 
 /// Send a test notification for manual testing during development.
@@ -194,6 +239,7 @@ pub fn run() {
             get_active_notifications,
             health,
             test_notify,
+            action_callback,
         ])
         .setup(|app| {
             info!("syncfu starting up");

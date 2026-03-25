@@ -189,6 +189,7 @@ pub enum ProgressStyle { Bar, Ring }
 |--------|------|-------------|
 | `POST` | `/notify` | Send notification → returns `{ "id": "uuid" }` |
 | `POST` | `/notify/{id}/update` | Update progress/body of existing notification |
+| `POST` | `/notify/{id}/action` | Trigger action → fires webhook to `callback_url`, dismisses |
 | `POST` | `/notify/{id}/dismiss` | Dismiss specific notification |
 | `POST` | `/dismiss-all` | Dismiss all |
 | `GET` | `/health` | `{ "status": "ok", "active_count": N }` |
@@ -555,7 +556,8 @@ These files contain patterns to reuse/adapt:
 - **Dynamic panel resize**: Panel fits exactly to content height, no click-blocking transparent area
 - **Grain texture**: Subtle SVG noise at 3% opacity for depth
 - **Typography**: SF Mono for sender/timestamp (dev-tool identity), SF Pro for content
-- **Tests**: 112 total (67 frontend, 45 Rust)
+- **Webhook callbacks**: Action buttons fire HTTP POST to `callback_url`, dismiss after action
+- **Tests**: 119 total (68 frontend, 51 Rust)
 
 ### In Progress
 - MainApp.tsx (shell only, needs enhanced UI)
@@ -660,8 +662,11 @@ A dedicated tab/view in the main app window for comprehensive notification testi
 - **Verify:** clicks pass through empty overlay space, notification cards are interactive
 
 ### Phase 4: HTTP + WebSocket Servers -- PARTIAL
-- [x] axum HTTP server on port 9868 (notify, dismiss, update, dismiss-all, health, active) (11 tests)
+- [x] axum HTTP server on port 9868 (notify, dismiss, update, dismiss-all, health, active, action) (13 tests)
 - [x] tauri-plugin-log: 5MB rotation, dev/prod files, webview console bridge
+- [x] Webhook callbacks: `POST /notify/{id}/action` fires HTTP POST to `callback_url` (5s timeout)
+- [x] `action_callback` Tauri command: frontend action buttons trigger webhook + dismiss
+- [x] `fire.py --webhook` test mode: starts listener on :9870, sends notification with callback_url
 - [ ] tokio-tungstenite WebSocket server on port 9869
 - [ ] CLI wrapper binary (clap + reqwest)
 - [ ] **Verify:** `curl POST /notify` shows notification in overlay
@@ -676,7 +681,7 @@ A dedicated tab/view in the main app window for comprehensive notification testi
 - [ ] JSON editor toggle (form view ↔ raw JSON)
 
 ### Phase 5: Rich Features
-- Action buttons + callback dispatch (HTTP POST to `callback_url` + WS outbound)
+- ~~Action buttons + callback dispatch~~ → DONE (moved to Phase 4)
 - Progress bars (update via `POST /notify/{id}/update` or WS `update` message)
 - Markdown body rendering (`react-markdown` + `remark-gfm`)
 - Notification grouping (collapse/expand by `group` key)
