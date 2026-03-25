@@ -144,7 +144,7 @@ pub fn run() {
         Target::new(TargetKind::Stdout),
     ];
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets(log_targets)
@@ -158,7 +158,15 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .manage(manager)
+        .manage(manager);
+
+    // Register tauri-nspanel plugin on macOS for NSPanel support
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             notify,
             dismiss_notification,

@@ -1,11 +1,30 @@
 //! Notification panel window — a small positioned overlay instead of fullscreen.
 //!
-//! The panel is a transparent, always-on-top, non-focusing WebviewWindow
-//! positioned at the top-right of the primary monitor's work area.
-//! On macOS, this will eventually use tauri-nspanel for proper NSPanel behavior.
+//! Platform strategy:
+//! - macOS: NSPanel via tauri-nspanel (non-activating, joins all Spaces, proper z-order)
+//! - Windows: WebviewWindow with always_on_top + focused(false) (Meetily pattern)
+//! - Linux: Deferred (basic WebviewWindow for now)
 
 use log::{error, info};
-use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
+use tauri::{AppHandle, Manager};
+
+#[cfg(target_os = "macos")]
+use tauri_nspanel::ManagerExt;
+
+// NSPanel type for macOS notification overlay:
+// - can_become_key_window: false (never steals keyboard focus)
+// - can_become_main_window: false (never becomes the main window)
+// - is_floating_panel: true (floats above regular windows)
+#[cfg(target_os = "macos")]
+tauri_nspanel::tauri_panel! {
+    panel!(NotificationPanel {
+        config: {
+            can_become_key_window: false,
+            can_become_main_window: false,
+            is_floating_panel: true
+        }
+    })
+}
 
 /// Panel dimensions in logical pixels.
 pub const PANEL_WIDTH: f64 = 400.0;
@@ -49,23 +68,87 @@ pub fn calculate_panel_position(monitor: MonitorInfo) -> PanelPosition {
 
 /// Create the notification panel window.
 ///
-/// Returns the window handle. The window is created hidden and should be shown
-/// when the first notification arrives.
-pub fn create_panel<R: Runtime>(app: &AppHandle<R>) -> Result<WebviewWindow<R>, String> {
-    let (position, width, height) = match get_monitor_info(app) {
-        Some(monitor) => {
-            let pos = calculate_panel_position(monitor);
-            (pos, PANEL_WIDTH, PANEL_MAX_HEIGHT)
-        }
+/// On macOS, creates an NSPanel for proper floating panel behavior.
+/// On other platforms, creates a standard WebviewWindow with always-on-top.
+/// The panel starts hidden and should be shown when the first notification arrives.
+pub fn create_panel(app: &AppHandle) -> Result<(), String> {
+    let position = match get_monitor_info(app) {
+        Some(monitor) => calculate_panel_position(monitor),
         None => {
             info!("No monitor info — using default panel position");
-            (PanelPosition { x: 1508.0, y: 12.0 }, PANEL_WIDTH, PANEL_MAX_HEIGHT)
+            PanelPosition { x: 1508.0, y: 12.0 }
         }
     };
 
-    info!("Creating notification panel at ({}, {}), size {}x{}", position.x, position.y, width, height);
+    info!(
+        "Creating notification panel at ({}, {}), size {}x{}",
+        position.x, position.y, PANEL_WIDTH, PANEL_MAX_HEIGHT
+    );
 
-    tauri::WebviewWindowBuilder::new(
+    #[cfg(target_os = "macos")]
+    create_macos_panel(app, position)?;
+
+    #[cfg(not(target_os = "macos"))]
+    create_standard_panel(app, position)?;
+
+    Ok(())
+}
+
+/// macOS: Create an NSPanel via tauri-nspanel.
+///
+/// NSPanel provides:
+/// - Non-activating (doesn't steal focus from the frontmost app)
+/// - Joins all Spaces (visible on every macOS desktop)
+/// - Proper z-order (above windows, below system UI)
+/// - Full-screen auxiliary (visible over fullscreen apps)
+#[cfg(target_os = "macos")]
+fn create_macos_panel(
+    app: &AppHandle,
+    position: PanelPosition,
+) -> Result<(), String> {
+    use tauri_nspanel::PanelBuilder;
+
+    let _panel = PanelBuilder::<_, NotificationPanel>::new(app, "overlay")
+        .url(tauri::WebviewUrl::App("index.html".into()))
+        .level(tauri_nspanel::PanelLevel::Status)
+        .no_activate(true)
+        .floating(true)
+        .collection_behavior(
+            tauri_nspanel::CollectionBehavior::new()
+                .can_join_all_spaces()
+                .full_screen_auxiliary(),
+        )
+        .has_shadow(true)
+        .transparent(true)
+        .size(tauri::Size::Logical(tauri::LogicalSize::new(PANEL_WIDTH, PANEL_MAX_HEIGHT)))
+        .position(tauri::Position::Logical(tauri::LogicalPosition::new(position.x, position.y)))
+        .with_window(|builder| {
+            builder
+                .decorations(false)
+                .skip_taskbar(true)
+                .resizable(false)
+                .visible(false)
+                .title("syncfu overlay")
+        })
+        .build()
+        .map_err(|e| format!("Failed to create macOS panel: {e}"))?;
+
+    info!("macOS NSPanel created (non-activating, joins all Spaces)");
+    Ok(())
+}
+
+/// Windows/Linux: Create a standard WebviewWindow with always-on-top.
+///
+/// Uses the Meetily pattern:
+/// - always_on_top(true) for z-order
+/// - focused(false) to avoid focus theft
+/// - transparent + no decorations for floating appearance
+#[cfg(not(target_os = "macos"))]
+fn create_standard_panel(
+    app: &AppHandle,
+    position: PanelPosition,
+) -> Result<(), String> {
+    let _window = tauri::WebviewWindowBuilder::new(
         app,
         "overlay",
         tauri::WebviewUrl::App("index.html".into()),
@@ -77,30 +160,49 @@ pub fn create_panel<R: Runtime>(app: &AppHandle<R>) -> Result<WebviewWindow<R>, 
     .shadow(false)
     .focused(false)
     .resizable(false)
-    .visible(false) // Start hidden — show when first notification arrives
-    .inner_size(width, height)
+    .visible(false)
+    .inner_size(PANEL_WIDTH, PANEL_MAX_HEIGHT)
     .position(position.x, position.y)
     .title("syncfu overlay")
     .build()
-    .map_err(|e| format!("Failed to create panel: {e}"))
+    .map_err(|e| format!("Failed to create panel: {e}"))?;
+
+    info!("Standard panel created (always-on-top, non-focusing)");
+    Ok(())
 }
 
 /// Show the panel window (e.g. when a notification arrives).
-pub fn show_panel<R: Runtime>(app: &AppHandle<R>) {
+pub fn show_panel(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(panel) = app.get_webview_panel("overlay") {
+            panel.show();
+            return;
+        }
+    }
+
     if let Some(window) = app.get_webview_window("overlay") {
         let _ = window.show();
     }
 }
 
 /// Hide the panel window (e.g. when all notifications are dismissed).
-pub fn hide_panel<R: Runtime>(app: &AppHandle<R>) {
+pub fn hide_panel(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(panel) = app.get_webview_panel("overlay") {
+            panel.hide();
+            return;
+        }
+    }
+
     if let Some(window) = app.get_webview_window("overlay") {
         let _ = window.hide();
     }
 }
 
 /// Extract monitor info from the primary monitor.
-fn get_monitor_info<R: Runtime>(app: &AppHandle<R>) -> Option<MonitorInfo> {
+fn get_monitor_info(app: &AppHandle) -> Option<MonitorInfo> {
     match app.primary_monitor() {
         Ok(Some(monitor)) => {
             let size = monitor.size();
