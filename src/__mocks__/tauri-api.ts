@@ -28,15 +28,17 @@ export const core = {
   }),
 };
 
+const mockCurrentWindow = {
+  label: "main",
+  setIgnoreCursorEvents: vi.fn(() => Promise.resolve()),
+  show: vi.fn(() => Promise.resolve()),
+  hide: vi.fn(() => Promise.resolve()),
+  close: vi.fn(() => Promise.resolve()),
+  onCloseRequested: vi.fn(() => Promise.resolve(() => {})),
+};
+
 export const window = {
-  getCurrentWindow: vi.fn(() => ({
-    label: "main",
-    setIgnoreCursorEvents: vi.fn(() => Promise.resolve()),
-    show: vi.fn(() => Promise.resolve()),
-    hide: vi.fn(() => Promise.resolve()),
-    close: vi.fn(() => Promise.resolve()),
-    onCloseRequested: vi.fn(() => Promise.resolve(() => {})),
-  })),
+  getCurrentWindow: vi.fn(() => mockCurrentWindow),
   Window: {
     getByLabel: vi.fn((_label: string) => null),
   },

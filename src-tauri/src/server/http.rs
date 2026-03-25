@@ -125,8 +125,9 @@ async fn handle_notify(
 
     let id = state.manager.add(payload.clone()).await;
 
-    // Emit to frontend if app handle is available
+    // Show panel and emit to frontend
     if let Some(ref app) = state.app_handle {
+        crate::overlay::panel::show_panel(app);
         debug!("Emitting notification:add for id={id}");
         match tauri::Emitter::emit(app, "notification:add", &payload) {
             Ok(()) => info!("Notification emitted: id={id} sender={}", req_sender),
@@ -178,6 +179,10 @@ async fn handle_dismiss(
     if dismissed.is_some() {
         if let Some(ref app) = state.app_handle {
             let _ = tauri::Emitter::emit(app, "notification:dismiss", &id);
+            // Hide panel if no more active notifications
+            if state.manager.active_count().await == 0 {
+                crate::overlay::panel::hide_panel(app);
+            }
         }
         info!("Notification dismissed: id={id}");
         StatusCode::OK
@@ -194,6 +199,7 @@ async fn handle_dismiss_all(
     let count = dismissed.len();
 
     if let Some(ref app) = state.app_handle {
+        crate::overlay::panel::hide_panel(app);
         let _ = tauri::Emitter::emit(app, "notification:dismiss-all", &count);
     }
 

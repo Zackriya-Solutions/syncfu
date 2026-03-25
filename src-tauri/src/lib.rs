@@ -1,4 +1,5 @@
 pub mod notification;
+pub mod overlay;
 pub mod server;
 pub mod tray;
 
@@ -24,6 +25,7 @@ async fn notify(
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let id = manager.add(payload.clone()).await;
+    overlay::panel::show_panel(&app);
     app.emit("notification:add", &payload)
         .map_err(|e| e.to_string())?;
     Ok(id)
@@ -39,6 +41,10 @@ async fn dismiss_notification(
     if dismissed.is_some() {
         app.emit("notification:dismiss", &id)
             .map_err(|e| e.to_string())?;
+        // Hide panel if no more active notifications
+        if manager.active_count().await == 0 {
+            overlay::panel::hide_panel(&app);
+        }
     }
     Ok(dismissed.is_some())
 }
@@ -50,6 +56,7 @@ async fn dismiss_all(
 ) -> Result<usize, String> {
     let dismissed = manager.dismiss_all().await;
     let count = dismissed.len();
+    overlay::panel::hide_panel(&app);
     app.emit("notification:dismiss-all", &count)
         .map_err(|e| e.to_string())?;
     Ok(count)
@@ -110,6 +117,7 @@ async fn test_notify(
         created_at: chrono::Utc::now(),
     };
     let id = manager.add(payload.clone()).await;
+    overlay::panel::show_panel(&app);
     app.emit("notification:add", &payload)
         .map_err(|e| e.to_string())?;
     Ok(id)
@@ -168,36 +176,10 @@ pub fn run() {
                 .expect("failed to set up system tray");
             info!("System tray initialized");
 
-            // Get primary monitor dimensions for overlay sizing
-            let (width, height) = match app.primary_monitor() {
-                Ok(Some(monitor)) => {
-                    let size = monitor.size();
-                    (size.width as f64, size.height as f64)
-                }
-                _ => (1920.0, 1080.0), // fallback
-            };
-
-            info!("Creating overlay window: {width}x{height}");
-
-            // Create overlay window — fullscreen, transparent, always on top
-            let _overlay = tauri::WebviewWindowBuilder::new(
-                app,
-                "overlay",
-                tauri::WebviewUrl::App("index.html".into()),
-            )
-            .transparent(true)
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .shadow(false)
-            .focused(false)
-            .resizable(false)
-            .visible(true)
-            .inner_size(width, height)
-            .position(0.0, 0.0)
-            .title("syncfu overlay")
-            .build()
-            .expect("failed to create overlay window");
+            // Create notification panel — small positioned window, top-right
+            overlay::panel::create_panel(app.handle())
+                .expect("failed to create notification panel");
+            info!("Notification panel created (hidden until first notification)");
 
             // Start HTTP server on port 9868
             info!("Starting HTTP server on port 9868");

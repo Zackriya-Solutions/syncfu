@@ -1,8 +1,17 @@
+import { useEffect } from "react";
+import { window as tauriWindow } from "@tauri-apps/api";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationCard } from "./NotificationCard";
 
 export function NotificationOverlay() {
   const { notifications, dismiss } = useNotifications();
+
+  // Hide the panel window when all notifications are dismissed
+  useEffect(() => {
+    if (notifications.length === 0) {
+      tauriWindow.getCurrentWindow().hide();
+    }
+  }, [notifications.length]);
 
   const handleAction = (_notificationId: string, _actionId: string) => {
     // TODO: send action callback via Tauri command

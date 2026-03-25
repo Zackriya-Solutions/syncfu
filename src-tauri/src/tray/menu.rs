@@ -93,6 +93,7 @@ fn handle_clear_all(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         let dismissed = manager.dismiss_all().await;
         let count = dismissed.len();
+        crate::overlay::panel::hide_panel(&app_handle);
         let _ = tauri::Emitter::emit(&app_handle, "notification:dismiss-all", &count);
     });
 }
