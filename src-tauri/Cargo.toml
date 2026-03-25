@@ -28,9 +28,14 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1"
 indexmap = { version = "2", features = ["serde"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["cors"] }
 
 [dev-dependencies]
 serde_json = "1"
+reqwest = { version = "0.12", features = ["json"] }
+tokio-test = "0.4"
+tower = { version = "0.5", features = ["util"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"

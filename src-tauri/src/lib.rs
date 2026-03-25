@@ -1,11 +1,13 @@
 pub mod notification;
+pub mod server;
 pub mod tray;
 
 use std::sync::Arc;
 
 use notification::manager::NotificationManager;
 use notification::types::{NotificationPayload, NotificationUpdate, Priority, Timeout};
-use tauri::Emitter;
+use server::http::ServerState;
+use tauri::{Emitter, Manager};
 
 #[tauri::command]
 async fn notify(
@@ -158,6 +160,18 @@ pub fn run() {
             .title("syncfu overlay")
             .build()
             .expect("failed to create overlay window");
+
+            // Start HTTP server on port 9876
+            let manager = app.state::<Arc<NotificationManager>>().inner().clone();
+            let server_state = ServerState {
+                manager,
+                app_handle: Some(app.handle().clone()),
+            };
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = server::http::start_server(server_state, 9876).await {
+                    eprintln!("HTTP server error: {e}");
+                }
+            });
 
             Ok(())
         })
