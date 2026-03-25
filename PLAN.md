@@ -10,7 +10,7 @@ Build a standalone Tauri v2 app that acts as a universal notification overlay sh
 
 | Decision | Choice |
 |----------|--------|
-| IPC | HTTP REST (port 9876) + WebSocket (port 9877) |
+| IPC | HTTP REST (port 9868) + WebSocket (port 9869) |
 | Rendering | Single transparent overlay window, notifications as CSS-animated DOM elements |
 | App mode | System tray daemon + main app window (notification history) |
 | Startup | Launch at login (configurable), starts silently (tray + overlay only) |
@@ -183,7 +183,7 @@ pub enum ProgressStyle { Bar, Ring }
 
 ---
 
-## HTTP Server (axum, port 9876)
+## HTTP Server (axum, port 9868)
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -196,7 +196,7 @@ pub enum ProgressStyle { Bar, Ring }
 
 ---
 
-## WebSocket Server (tokio-tungstenite, port 9877)
+## WebSocket Server (tokio-tungstenite, port 9869)
 
 **Inbound (client → shell):**
 ```json
@@ -535,39 +535,133 @@ These files contain patterns to reuse/adapt:
 
 ---
 
+## Current Status (2026-03-25)
+
+### Completed
+- **Phase 1**: Scaffold, overlay window, main app window, system tray, CSS dark theme, multi-window routing
+- **Phase 2** (partial): Notification types, manager, Zustand stores, overlay component, cards, hooks
+- **Phase 4** (partial): HTTP server on port 9868 (notify, dismiss, update, dismiss-all, health, active)
+- **Logging**: tauri-plugin-log with 5MB file rotation, dev/prod separate files (syncfu-dev.log / syncfu.log), webview console bridging
+- **Tests**: 103 total (65 frontend @ 97.56% coverage, 38 Rust)
+
+### In Progress
+- Debugging overlay rendering (HTTP server stores notifications but overlay doesn't display them visually)
+- MainApp.tsx (shell only, needs enhanced UI)
+
+### Not Started
+- WebSocket server (port 9869)
+- CLI binary (clap + reqwest)
+- Click-through mechanism (Phase 3)
+- SQLite history (Phase 6)
+- Sound playback, markdown rendering, notification grouping, tray icon states
+- **Test UI** (see below)
+
+### Known Issues
+- Port 9876 conflicts with Meetily Pro → changed to 9868
+- `tauri-plugin-autostart` v2 doesn't accept config map in tauri.conf.json → removed, configured programmatically
+- Overlay window receives Tauri events but notifications not visually rendering (needs debugging)
+
+---
+
+## Test UI (In-App Notification Tester)
+
+A dedicated tab/view in the main app window for comprehensive notification testing without needing curl or CLI.
+
+### Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  syncfu                                          ─ □ ✕  │
+├──────────┬──────────────────────────────────────────────┤
+│          │  ┌─ Notification Tester ────────────────────┐ │
+│ History  │  │                                          │ │
+│          │  │ Sender:   [test-agent          ]         │ │
+│ Tester   │  │ Title:    [Build Complete      ]         │ │
+│          │  │ Body:     [All 142 tests passed]         │ │
+│ ──────── │  │ Priority: (○Low ●Normal ○High ○Critical) │ │
+│          │  │ Timeout:  [Default ▾]                    │ │
+│          │  │                                          │ │
+│          │  │ ── Actions ──────────────────────────     │ │
+│          │  │ [+ Add Action]                           │ │
+│          │  │  Label: [Open PR]  Style: [Primary ▾]    │ │
+│          │  │                                          │ │
+│          │  │ ── Progress ─────────────────────────     │ │
+│          │  │ [✓] Show progress  Value: [0.75]         │ │
+│          │  │ Label: [3 of 4]   Style: [Bar ▾]        │ │
+│          │  │                                          │ │
+│          │  │ ── Advanced ─────────────────────────     │ │
+│          │  │ Group:    [ci-builds           ]         │ │
+│          │  │ Sound:    [success ▾]                    │ │
+│          │  │ Theme:    [                    ]         │ │
+│          │  │                                          │ │
+│          │  │ ── Preview ──────────────────────────     │ │
+│          │  │ ┌──────────────────────────────────┐     │ │
+│          │  │ │ (live NotificationCard preview)  │     │ │
+│          │  │ └──────────────────────────────────┘     │ │
+│          │  │                                          │ │
+│          │  │ [🚀 Send Notification]  [📋 Copy curl]   │ │
+│          │  │                                          │ │
+│          │  │ ── Quick Templates ───────────────────    │ │
+│          │  │ [CI Build] [Reminder] [Deploy] [Error]   │ │
+│          │  │ [Progress] [With Actions] [Critical]     │ │
+│          │  └──────────────────────────────────────────┘ │
+└──────────┴──────────────────────────────────────────────┘
+```
+
+### Features
+
+1. **Form fields** for every NotificationPayload property
+2. **Live preview** — renders actual NotificationCard component with current form values
+3. **Send button** — invokes `test_notify` Tauri command (or HTTP POST) to trigger real notification
+4. **Copy curl** — generates the curl command for the current form state
+5. **Quick templates** — preset notification configs for common test scenarios
+6. **JSON editor toggle** — switch between form view and raw JSON editor
+
+---
+
 ## Implementation Phases
 
-### Phase 1: Scaffold + Overlay + Main App Window
-- Create Tauri v2 app with React+Vite template
-- Configure `tauri.conf.json`: no default window, tray enabled, `macOSPrivateApi: true`
-- Minimal system tray ("Open syncfu" + Quit)
-- Create overlay window (transparent, always-on-top, fullscreen, no decorations)
-- Create main app window (standard decorated window, 900x640, hidden by default)
-- Multi-window routing in frontend: read window label → render overlay or app shell
-- Main app shows notification history placeholder (empty state)
-- **Verify:** tray icon visible, "Open syncfu" shows main app window, overlay renders transparently
+### Phase 1: Scaffold + Overlay + Main App Window -- DONE
+- [x] Create Tauri v2 app with React+Vite template
+- [x] Configure `tauri.conf.json`: no default window, tray enabled, `macOSPrivateApi: true`
+- [x] Minimal system tray ("Open syncfu" + Quit with confirmation dialog)
+- [x] Create overlay window (transparent, always-on-top, fullscreen, no decorations)
+- [x] Multi-window routing in frontend: read window label → render overlay or app shell
+- [x] Main app shows notification history placeholder (empty state)
+- [x] CSS dark theme, typography, scrollbar, overlay styles, animations
 
-### Phase 2: Notification Types + Manager
-- Define all Rust types in `notification/types.rs`
-- Implement `NotificationManager` with `add()` / `dismiss()` / `update()`
-- Wire Tauri events (`notification:add`, `notification:dismiss`, `notification:update`)
-- Zustand store + `NotificationCard` component + `NotificationStack` positioning
-- CSS animations (slide-in-right, slide-out-right, reflow)
-- **Verify:** `test_notify` Tauri command shows animated notification in overlay
+### Phase 2: Notification Types + Manager -- DONE
+- [x] Define all Rust types in `notification/types.rs` (10 tests)
+- [x] Implement `NotificationManager` with `add()` / `dismiss()` / `update()` (11 tests)
+- [x] Wire Tauri events (`notification:add`, `notification:dismiss`, `notification:update`)
+- [x] Zustand stores: notificationStore (13 tests), historyStore (13 tests)
+- [x] NotificationCard component (9 tests), NotificationOverlay (13 tests)
+- [x] useNotifications hook (11 tests)
+- [x] CSS animations (slide-in-right, slide-out-right, reflow)
+- [ ] **Verify:** overlay displays notifications visually (event flow works but rendering not confirmed)
 
-### Phase 3: Click-Through
+### Phase 3: Click-Through -- NOT STARTED
 - CSS `pointer-events: none` on body, `auto` on cards
 - Rust-side mouse position polling (per-platform: CoreGraphics / Win32 / X11)
 - `update_card_rects` command from frontend → Rust
 - Toggle `setIgnoreCursorEvents` based on mouse-over-card detection
 - **Verify:** clicks pass through empty overlay space, notification cards are interactive
 
-### Phase 4: HTTP + WebSocket Servers
-- axum HTTP server with all endpoints
-- tokio-tungstenite WebSocket server with bidirectional protocol
-- Share `Arc<NotificationManager>` between servers and Tauri
-- Build CLI wrapper binary
-- **Verify:** `curl POST /notify` shows notification, `websocat` receives action callbacks
+### Phase 4: HTTP + WebSocket Servers -- PARTIAL
+- [x] axum HTTP server on port 9868 (notify, dismiss, update, dismiss-all, health, active) (11 tests)
+- [x] tauri-plugin-log: 5MB rotation, dev/prod files, webview console bridge
+- [ ] tokio-tungstenite WebSocket server on port 9869
+- [ ] CLI wrapper binary (clap + reqwest)
+- [ ] **Verify:** `curl POST /notify` shows notification in overlay
+
+### Phase 4.5: Test UI -- NEXT
+- [ ] Sidebar navigation (History / Tester tabs)
+- [ ] NotificationTester component with form fields for all payload properties
+- [ ] Live NotificationCard preview with current form values
+- [ ] Send button (invokes Tauri command to trigger real notification)
+- [ ] Copy curl button (generates curl command for current form state)
+- [ ] Quick templates (CI Build, Reminder, Deploy, Error, Progress, With Actions, Critical)
+- [ ] JSON editor toggle (form view ↔ raw JSON)
 
 ### Phase 5: Rich Features
 - Action buttons + callback dispatch (HTTP POST to `callback_url` + WS outbound)
