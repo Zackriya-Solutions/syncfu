@@ -1,0 +1,146 @@
+# PROJECT CONTEXT
+Project: syncfu (notification-shell)
+Repo: /Users/sujith/work/2026/reminders/notification-shell
+Branch: main
+Stack: Tauri v2 + Rust + React + TypeScript + Vite
+Purpose: Universal overlay notification system for AI agents, skills, autonomous loops, and background processes.
+Brand: syncfu.dev (open source)
+User context: ADHD — needs push-based notifications, doesn't go back to read terminal output.
+
+# COMPLETED WORK
+
+## Phase 0: Planning & Documentation
+- [x] PLAN.md — full architecture, project structure, all 6 phases, verification plan
+- [x] README.md — open source readme with 15+ use case categories, API docs, CLI examples, integrations
+- [x] Confirmed decisions: HTTP REST :9876, WebSocket :9877, Tauri overlay + main app window
+- [x] Startup at login (tauri-plugin-autostart), Ctrl+Q quit confirmation, close = hide to background
+- [x] Main app window design: notification history with filters, detail panel, sidebar nav
+
+## Phase 1: Scaffold + TDD Foundation (CURRENT — mostly complete)
+- [x] Tauri v2 project scaffolded (Cargo.toml, tauri.conf.json, build.rs)
+- [x] React + Vite frontend with TypeScript
+- [x] Vitest test setup with Tauri API mocks
+- [x] .gitignore
+- [x] Placeholder icons (32x32, 128x128, 128x128@2x — solid blue PNGs)
+
+### Rust backend
+- [x] notification/types.rs — NotificationPayload, Action, ProgressInfo, Priority, Timeout, HistoryEntry
+  - 10 unit tests (serde roundtrips, defaults, minimal/full JSON)
+- [x] notification/manager.rs — NotificationManager with add/dismiss/update/dismissAll/list
+  - Arc<RwLock<IndexMap>> pattern, MAX_VISIBLE=5, queue overflow, group tracking
+  - 11 async tests (add, replace, dismiss, queue promote, dismiss_all, update, groups)
+- [x] lib.rs — Tauri commands (notify, dismiss, update, dismiss_all, health, get_active)
+  - Overlay window creation in setup() — now monitor-aware (reads primary monitor, falls back to 1920x1080)
+  - on_window_event: hide main window on close instead of destroying
+  - Plugins: dialog, autostart, single-instance
+  - System tray setup integrated into app launch
+- [x] tray/menu.rs — System tray with Open, Clear All, Pause, Quit menu items
+  - Quit shows confirmation dialog ("Quit" / "Keep Running")
+  - Open creates or re-shows main app window (900x640, centered)
+  - Clear All dismisses all notifications and emits event
+  - 6 unit tests (menu ID uniqueness, snake_case validation, ID correctness)
+- [x] main.rs — binary entry point
+- [x] Tauri v2 capabilities JSON — permissions for events, windows, dialog, autostart
+- [x] test_notify command — sends a sample notification for dev testing
+- [x] macOS dock reopen handler — re-shows/creates main window on dock click
+- [x] cargo check passes, cargo test passes (27 tests)
+
+### Frontend
+- [x] types/notification.ts — mirrors Rust types
+- [x] stores/notificationStore.ts — Zustand store for active overlay notifications
+  - 13 tests (add, prepend, immutability, replace, max visible, dismiss, queue promote, update, dismissAll, clear)
+- [x] stores/historyStore.ts — Zustand store for history list, filters, pagination
+  - 13 tests (setEntries, prependEntry, selectedId, search/sender/priority/date filters, clearFilters, loading, senders, reset)
+- [x] App.tsx — multi-window router (reads window label → overlay or main app)
+  - 2 tests (overlay route, main route)
+- [x] components/overlay/NotificationOverlay.tsx — transparent container with Tauri event subscriptions
+  - Subscribes to notification:add, notification:dismiss, notification:dismiss-all events
+  - Renders NotificationCard components from Zustand store
+  - Shows notification-stack container when notifications exist
+  - 13 tests (render, store integration, event subscriptions, event handling, dismiss, cleanup)
+- [x] components/overlay/NotificationCard.tsx — single notification card with actions, progress, themes
+  - 9 tests (title/body, sender, priority class, actions, onAction, onDismiss, progress bar, no progress, theme class)
+- [x] components/app/MainApp.tsx — app shell with sidebar + content area
+- [x] components/app/HistoryView.tsx — notification history list with empty state, relative time
+  - 4 tests (empty state, entries render, priority indicators, relative time)
+- [x] __mocks__/ — Tauri API, autostart, dialog mocks for testing
+- [x] test-setup.ts, vitest.config.ts with path aliases and coverage thresholds
+- [x] hooks/useNotifications.ts — reusable hook for Tauri event subscriptions
+  - Subscribes to notification:add, notification:dismiss, notification:dismiss-all
+  - Provides dismiss/dismissAll functions, returns notifications array
+  - 11 tests (store integration, event subscriptions, event handling, cleanup)
+- [x] pnpm test passes (65 tests), 97.56% statement coverage
+- [x] CSS styles: globals.css, overlay.css, app.css, animations.css (dark theme, backdrop blur, slide animations)
+
+### Git
+- [x] 7f8390b — feat: scaffold syncfu — universal overlay notification system (43 files)
+- [x] 61848c5 — feat: add tray menu, capabilities, and NotificationOverlay with event subscriptions
+- [x] de5d7d4 — feat: add CSS styles for overlay, main app, and animations
+- [x] 1315c31 — feat: load tray icon from bundled PNG
+- [x] 90773b4 — feat: add test_notify command and macOS dock reopen handler
+- [x] 657a943 — refactor: extract useNotifications hook from overlay component
+
+# TODO LIST
+
+## Phase 1 Remaining — Get to Launchable State
+- [x] CSS styles (globals.css, overlay.css, app.css, animations.css)
+- [x] macOS dock reopen event → re-show main window
+- [x] Tray icon loaded from bundled PNG
+- [ ] Tray icon state changes (bell states: normal, has-notifications, paused)
+- [ ] Approve pnpm build scripts (esbuild) — `pnpm approve-builds` needed interactively
+- [ ] First `cargo tauri dev` launch test
+
+## Phase 2: Notification Types + Live Rendering
+- [x] useNotifications hook — Tauri event subscriptions, extracted from overlay
+- [x] test_notify Tauri command for manual testing
+- [x] CSS animations (slide-in-right, slide-out-right, reflow) — defined in animations.css
+- [ ] NotificationStack component — positioning/stacking logic (top-right, 10px spacing) — partially done in overlay
+
+## Phase 3: Click-Through
+- [ ] CSS pointer-events: none on overlay body, auto on cards
+- [ ] Rust-side mouse position polling (macOS: CGEvent, Windows: GetCursorPos, Linux: XQueryPointer)
+- [ ] update_card_rects command from frontend → Rust
+- [ ] setIgnoreCursorEvents toggle logic
+- [ ] Platform-specific dependencies (core-graphics, windows crate, x11 crate)
+
+## Phase 4: HTTP + WebSocket Servers
+- [ ] axum HTTP server (POST /notify, /notify/{id}/update, /notify/{id}/dismiss, /dismiss-all, GET /health, /history)
+- [ ] tokio-tungstenite WebSocket server (bidirectional protocol)
+- [ ] Share Arc<NotificationManager> between servers and Tauri
+- [ ] CLI binary (cli/Cargo.toml, clap + reqwest)
+
+## Phase 5: Rich Features
+- [ ] Action buttons + callback dispatch (POST to callback_url, WS outbound)
+- [ ] Progress bars (update via HTTP or WS)
+- [ ] Markdown body rendering (react-markdown + remark-gfm)
+- [ ] Notification grouping (collapse/expand by group key)
+- [ ] Sound playback (rodio, pre-loaded .wav files)
+- [ ] Custom themes/CSS per sender
+
+## Phase 6: History + Settings + Polish
+- [ ] SQLite history (sqlx, migrations)
+- [ ] Wire history to main app window (HistoryView, HistoryFilters, HistoryDetail, real-time updates)
+- [ ] Settings view (port, position, default timeout, DND, sounds toggle)
+- [ ] Multi-monitor support
+- [ ] Max 5 visible notifications, queue overflow UI
+- [ ] Cross-platform testing
+
+# KNOWN ISSUES
+- Placeholder icons are solid blue squares (need proper bell icons)
+- pnpm build scripts (esbuild) not approved — run `pnpm approve-builds` interactively before `cargo tauri dev`
+- Tray icon states (has-notifications, paused) not yet implemented
+
+# CURRENT STATUS
+Phase 1 nearly complete. All code compiles and tests pass (81 total: 54 frontend + 27 Rust, 97.43% coverage).
+Capabilities, tray menu, CSS styles, overlay event subscriptions, test_notify command, dock reopen all done.
+Blocker: run `pnpm approve-builds` interactively to approve esbuild, then `cargo tauri dev` for first launch.
+Next step: Phase 3 click-through, or Phase 4 HTTP/WS servers. Run `pnpm approve-builds` interactively then `cargo tauri dev` to validate.
+
+# OBSERVATIONS & DECISIONS
+- Using single index.html for both windows — frontend reads window label to decide overlay vs main app
+- NotificationManager uses IndexMap (ordered) not HashMap for predictable notification ordering
+- Zustand stores use readonly types for immutability enforcement
+- Tauri API fully mocked in tests — no Tauri runtime needed for frontend testing
+- Coverage thresholds set at 80% in vitest config — currently at 97%+
+- tauri-plugin-dialog v2 uses `.buttons(MessageDialogButtons::OkCancelCustom(...))` not `.ok_button_label()`
+- Tauri v2 split `Manager` and `Emitter` into separate traits — import `Emitter` for `app.emit()`
