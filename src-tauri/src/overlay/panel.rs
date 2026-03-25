@@ -125,6 +125,7 @@ fn create_macos_panel(
         .with_window(|builder| {
             builder
                 .transparent(true)
+                .background_color(tauri::window::Color(0, 0, 0, 0))
                 .decorations(false)
                 .skip_taskbar(true)
                 .resizable(false)

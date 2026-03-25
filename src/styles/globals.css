@@ -48,6 +48,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Transparent window support (overlay panel) */
+html[data-transparent-window],
+html[data-transparent-window] body {
+  background: transparent !important;
+}
+
 #root {
   height: 100%;
 }

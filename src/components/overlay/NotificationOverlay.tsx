@@ -6,9 +6,9 @@ import { NotificationCard } from "./NotificationCard";
 export function NotificationOverlay() {
   const { notifications, dismiss } = useNotifications();
 
-  // Set transparent background on the overlay window (not the main app)
+  // Set transparent background on the overlay window (Cap pattern)
   useEffect(() => {
-    document.documentElement.style.background = "transparent";
+    document.documentElement.setAttribute("data-transparent-window", "true");
     document.body.style.background = "transparent";
   }, []);
 
