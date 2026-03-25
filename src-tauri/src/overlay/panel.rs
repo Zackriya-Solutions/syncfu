@@ -172,33 +172,47 @@ fn create_standard_panel(
 }
 
 /// Show the panel window (e.g. when a notification arrives).
+///
+/// IMPORTANT: On macOS, NSPanel operations MUST run on the main thread.
+/// This function dispatches to the main thread to avoid crashes.
 pub fn show_panel(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        if let Ok(panel) = app.get_webview_panel("overlay") {
-            panel.show();
-            return;
+    let handle = app.clone();
+    let inner = app.clone();
+    let _ = handle.run_on_main_thread(move || {
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(panel) = inner.get_webview_panel("overlay") {
+                panel.show();
+                return;
+            }
         }
-    }
 
-    if let Some(window) = app.get_webview_window("overlay") {
-        let _ = window.show();
-    }
+        if let Some(window) = inner.get_webview_window("overlay") {
+            let _ = window.show();
+        }
+    });
 }
 
 /// Hide the panel window (e.g. when all notifications are dismissed).
+///
+/// IMPORTANT: On macOS, NSPanel operations MUST run on the main thread.
+/// This function dispatches to the main thread to avoid crashes.
 pub fn hide_panel(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        if let Ok(panel) = app.get_webview_panel("overlay") {
-            panel.hide();
-            return;
+    let handle = app.clone();
+    let inner = app.clone();
+    let _ = handle.run_on_main_thread(move || {
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(panel) = inner.get_webview_panel("overlay") {
+                panel.hide();
+                return;
+            }
         }
-    }
 
-    if let Some(window) = app.get_webview_window("overlay") {
-        let _ = window.hide();
-    }
+        if let Some(window) = inner.get_webview_window("overlay") {
+            let _ = window.hide();
+        }
+    });
 }
 
 /// Extract monitor info from the primary monitor.
