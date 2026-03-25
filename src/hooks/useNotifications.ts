@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from "react";
-import { event as tauriEvent } from "@tauri-apps/api";
+import { event as tauriEvent, core } from "@tauri-apps/api";
 import { useNotificationStore } from "@/stores/notificationStore";
 import type { NotificationPayload } from "@/types/notification";
 
@@ -49,12 +49,15 @@ export function useNotifications() {
   const dismiss = useCallback(
     (id: string) => {
       storeDismiss(id);
+      // Also dismiss on the backend so the panel hides when empty
+      core.invoke("dismiss_notification", { id }).catch(() => {});
     },
     [storeDismiss]
   );
 
   const dismissAll = useCallback(() => {
     storeDismissAll();
+    core.invoke("dismiss_all").catch(() => {});
   }, [storeDismissAll]);
 
   return {
