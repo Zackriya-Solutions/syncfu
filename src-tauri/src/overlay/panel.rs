@@ -124,6 +124,7 @@ fn create_macos_panel(
         .position(tauri::Position::Logical(tauri::LogicalPosition::new(position.x, position.y)))
         .with_window(|builder| {
             builder
+                .transparent(true)
                 .decorations(false)
                 .skip_taskbar(true)
                 .resizable(false)
