@@ -10,6 +10,14 @@ One command. One notification on your screen. That's it.
 syncfu send "All 47 tests passing."
 ```
 
+Need a decision from the user? Add `--wait` and the CLI blocks until they click.
+
+```bash
+syncfu send -t "Deploy?" -a "yes:Yes" -a "no:No:danger" \
+  --wait "Ship to production?"
+# stdout: "yes" or "no", exit 0. Dismissed = exit 1. Timeout = exit 2.
+```
+
 Need more? Add flags.
 
 ```bash
@@ -107,6 +115,10 @@ syncfu send -t "Build Complete" -p high "All 142 tests passing"
 # With action buttons
 syncfu send -t "PR #42" --action "approve:Approve:primary" --action "skip:Skip:secondary" "Review requested"
 
+# Block until the user responds (--wait)
+ACTION=$(syncfu send -t "Approve?" -a "yes:Yes" -a "no:No:danger" --wait "Merge PR #42?")
+echo "User chose: $ACTION"  # "yes", "no", "dismissed", or "timeout"
+
 # Or use curl
 curl -X POST localhost:9868/notify \
   -H "Content-Type: application/json" \
@@ -152,6 +164,16 @@ Running `/loop` or a multi-agent workflow that takes 30 minutes? Get notified wh
 syncfu send -t "Phase 3/5 complete" -s loop-operator \
   --progress 0.6 --progress-label "3 of 5" \
   "Integration tests: 42 passed, 0 failed. Starting E2E phase..."
+```
+
+**Agent decision gates**
+An agent needs human approval before a destructive action. Use `--wait` to block the agent until the user responds via the overlay notification.
+
+```bash
+syncfu send -t "Confirm" -s agent -p high \
+  -a "yes:Proceed" -a "no:Cancel:danger" \
+  --wait --wait-timeout 120 \
+  "Delete 47 stale branches?" && git branch -d $(git branch --merged)
 ```
 
 **Agent handoff alerts**
@@ -235,7 +257,14 @@ Scheduled notifications that interrupt with context: *"You've been on this bug f
 A nightly cron fires at 6pm: *"EOD check: 3 reminders still open, 2 PRs need review, tomorrow's first meeting is at 9am."*
 
 **Medication reminders**
-For ADHD medication timing — a critical-priority notification with no auto-dismiss that stays on screen until you acknowledge it.
+For ADHD medication timing — a critical-priority notification with no auto-dismiss that stays on screen until you acknowledge it. Use `--wait` so the reminding system knows you actually took it.
+
+```bash
+syncfu send -t "Medication" -p critical -i pill --timeout never \
+  -a "taken:Taken" -a "skip:Skip:danger" \
+  --wait "Time to take your medication"
+# Blocks until user confirms — returns "taken" or "skip"
+```
 
 **Hydration / posture / break nudges**
 Recurring gentle notifications every 30-60 minutes. Low priority, auto-dismiss after 10 seconds, but enough to break the hyperfocus tunnel.
@@ -379,9 +408,10 @@ Open syncfu from the system tray or dock to see your notification history — ev
 | `POST` | `/notify/{id}/update` | Update an existing notification (progress, body) |
 | `POST` | `/notify/{id}/action` | Trigger an action (fires webhook to `callbackUrl`, dismisses) |
 | `POST` | `/notify/{id}/dismiss` | Dismiss a specific notification |
+| `GET` | `/notify/{id}/wait` | SSE stream — blocks until action/dismiss (powers `--wait`) |
 | `POST` | `/dismiss-all` | Dismiss all active notifications |
 | `GET` | `/health` | Server status and active notification count |
-| `GET` | `/history` | Query history (`?sender=X&limit=50`) |
+| `GET` | `/active` | List all active notifications (JSON array) |
 
 ### Notification payload
 
@@ -539,25 +569,28 @@ requests.post('http://localhost:9868/notify', json={
 ## Architecture
 
 ```
-                           ┌─────────────────────────────────┐
-                           │         syncfu (Tauri v2)        │
-                           │                                  │
- HTTP POST :9868 ─────────▸│  axum server ──▸ Notification    │
-                           │                  Manager         │──emit──▸ React Overlay
- WebSocket :9869 ─────────▸│  tungstenite ──▸ (Arc shared)   │         (transparent window)
-                           │                      │           │
- CLI ─────────────────────▸│                 ┌────┴────┐      │
-                           │                 │ History │      │
-                           │                 │ Sound   │      │
-                           │                 │ Tray    │      │
-                           │                 └─────────┘      │
-                           └─────────────────────────────────┘
+                           ┌──────────────────────────────────┐
+                           │          syncfu (Tauri v2)        │
+                           │                                   │
+ HTTP POST :9868 ─────────▸│  axum server ──▸ Notification     │
+                           │       │          Manager          │──emit──▸ React Overlay
+ CLI (fire & forget) ─────▸│       │          (Arc shared)     │         (follows cursor monitor)
+                           │       │              │            │
+ CLI (--wait) ─────────────▸│  SSE stream ◂── Waiter Registry │
+                           │       │         (broadcast ch)    │
+                           │       │              │            │
+                           │       │         ┌────┴────┐       │
+                           │       │         │ Tray    │       │
+                           │       │         │ Webhook │       │
+                           │       │         └─────────┘       │
+                           └──────────────────────────────────┘
 ```
 
-- **Rust backend**: axum HTTP + tokio-tungstenite WS + SQLite history + rodio sound
-- **React frontend**: Zustand store, CSS animations, markdown rendering
-- **Overlay**: Single transparent always-on-top window, click-through except on notification cards
-- **System tray**: Pause, clear, history, settings, server status
+- **Rust backend**: axum HTTP server + SSE wait streams + waiter registry (tokio broadcast)
+- **React frontend**: Zustand store, CSS animations, Lucide icons, Google Fonts
+- **Overlay**: NSPanel (macOS) — non-activating, follows mouse cursor across monitors
+- **CLI**: fire-and-forget by default, `--wait` opens SSE stream for blocking responses
+- **System tray**: Pause, clear, settings, server status
 
 ---
 
@@ -621,14 +654,15 @@ Then use `"theme": "github-dark"` in your notification payload.
 - [x] Per-notification style overrides (27 customizable properties)
 - [x] Per-action button styling (bg, color, borderColor, icon)
 - [x] CLI binary (`syncfu send/dismiss/list/health`)
-- [x] 170 tests (72 frontend + 56 Rust + 16 CLI unit + 10 CLI integration)
+- [x] CLI `--wait` flag (SSE-based blocking until action/dismiss/timeout)
+- [x] Multi-monitor support (notification follows mouse cursor)
+- [x] 181 tests (72 frontend + 70 Rust server + 29 CLI unit + 10 CLI integration)
 - [ ] Click-through mechanism
 - [ ] WebSocket server (port 9869)
 - [ ] Markdown body rendering
 - [ ] Notification grouping
 - [ ] Sound playback
 - [ ] SQLite history
-- [ ] Multi-monitor support
 - [ ] Linux Wayland support
 - [ ] Plugin SDK (custom notification templates)
 - [ ] Encrypted transport (mTLS / API keys)
