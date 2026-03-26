@@ -58,9 +58,8 @@ command -v curl >/dev/null 2>&1 || error "curl is required but not installed. In
 # --- Resolve version ---
 if [ -z "$VERSION" ]; then
   info "Resolving latest version..."
-  VERSION=$(curl -fsSL -o /dev/null -w '%{redirect_url}' \
-    "https://github.com/${REPO}/releases/latest" 2>/dev/null | \
-    sed 's|.*/v||')
+  VERSION=$(curl -sI "https://github.com/${REPO}/releases/latest" 2>/dev/null | \
+    grep -i '^location:' | sed 's|.*/v||' | tr -d '\r')
   if [ -z "$VERSION" ]; then
     error "Could not determine latest version. Try: --version=0.2.0"
   fi
