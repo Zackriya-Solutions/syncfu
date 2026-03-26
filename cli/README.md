@@ -8,6 +8,10 @@ Send notifications to the syncfu desktop overlay from anywhere — terminal, scr
 cargo install --path cli
 ```
 
+## Cheatsheet
+
+See the [CHEATSHEET.md](../CHEATSHEET.md) for a quick-reference of all commands and common patterns.
+
 ## Usage
 
 ```bash

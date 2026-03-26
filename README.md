@@ -80,6 +80,12 @@ cargo install --path .
 
 ---
 
+## Cheatsheet
+
+See [CHEATSHEET.md](CHEATSHEET.md) for a quick-reference of all CLI commands, flags, and common patterns on a single page.
+
+---
+
 ## Quick start
 
 ```bash
