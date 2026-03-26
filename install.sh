@@ -253,17 +253,28 @@ case ":${PATH:-}:" in
   *":${CLI_DIR}:"*)
     ;;
   *)
-    printf "\n"
-    warn "Add syncfu to your PATH:"
-    printf "\n"
     SHELL_NAME=$(basename "${SHELL:-/bin/sh}")
     case "$SHELL_NAME" in
-      zsh)  printf "  echo 'export PATH=\"%s:\$PATH\"' >> ~/.zshrc && source ~/.zshrc\n" "$CLI_DIR" ;;
-      bash) printf "  echo 'export PATH=\"%s:\$PATH\"' >> ~/.bashrc && source ~/.bashrc\n" "$CLI_DIR" ;;
-      fish) printf "  fish_add_path %s\n" "$CLI_DIR" ;;
-      *)    printf "  export PATH=\"%s:\$PATH\"\n" "$CLI_DIR" ;;
+      zsh)  RC_FILE="$HOME/.zshrc" ;;
+      bash) RC_FILE="$HOME/.bashrc" ;;
+      *)    RC_FILE="" ;;
     esac
-    printf "\n"
+
+    if [ -n "$RC_FILE" ] && [ -f "$RC_FILE" ]; then
+      printf 'export PATH="%s:$PATH"\n' "$CLI_DIR" >> "$RC_FILE"
+      export PATH="${CLI_DIR}:${PATH}"
+      info "Added ${CLI_DIR} to PATH (${RC_FILE})"
+    elif [ "$SHELL_NAME" = "fish" ]; then
+      fish -c "fish_add_path $CLI_DIR" 2>/dev/null || true
+      export PATH="${CLI_DIR}:${PATH}"
+      info "Added ${CLI_DIR} to PATH (fish)"
+    else
+      export PATH="${CLI_DIR}:${PATH}"
+      printf "\n"
+      warn "Add syncfu to your PATH manually:"
+      printf "  export PATH=\"%s:\$PATH\"\n" "$CLI_DIR"
+      printf "\n"
+    fi
     ;;
 esac
 
@@ -333,5 +344,5 @@ else
   printf "    curl -fsSL https://syncfu.dev/install.sh | sh\n"
 fi
 printf "\n"
-info "Done! Run ${BOLD}syncfu --help${RESET} to get started."
+printf "${GREEN}info${RESET}  Done! Run ${BOLD}syncfu --help${RESET} to get started.\n"
 printf "\n"
