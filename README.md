@@ -11,8 +11,8 @@
 <p align="center">
   <a href="https://github.com/Zackriya-Solutions/syncfu/releases"><img src="https://img.shields.io/github/v/release/Zackriya-Solutions/syncfu?style=flat-square&color=blue" alt="Release" /></a>
   <a href="https://github.com/Zackriya-Solutions/syncfu/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Zackriya-Solutions/syncfu?style=flat-square" alt="License" /></a>
-  <a href="https://github.com/Zackriya-Solutions/syncfu/actions"><img src="https://img.shields.io/github/actions/workflow/status/Zackriya-Solutions/syncfu/release-cli.yml?style=flat-square&label=build" alt="Build" /></a>
-  <img src="https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square" alt="Platform" />
+  <a href="https://github.com/Zackriya-Solutions/syncfu/actions"><img src="https://img.shields.io/github/actions/workflow/status/Zackriya-Solutions/syncfu/release.yml?style=flat-square&label=build" alt="Build" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/rust-1.75+-orange?style=flat-square&logo=rust" alt="Rust" />
 </p>
 
@@ -68,7 +68,7 @@ syncfu send -t "Loop complete" -p high -i circle-check \
 
 <br />
 
-Built with **Tauri v2** + **Rust** (axum) + **React** (Zustand). macOS first, Windows + Linux coming.
+Built with **Tauri v2** + **Rust** (axum) + **React** (Zustand). Ships on macOS, Windows, and Linux.
 
 ---
 
@@ -136,7 +136,7 @@ irm https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/install.ps1
 
 **Specific version:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/install.sh | sh -s -- --version=0.2.0
+curl -fsSL https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/install.sh | sh -s -- --version=X.Y.Z
 ```
 
 > SHA-256 checksum verification is enforced by default. Use `--skip-checksum` to bypass.
@@ -153,7 +153,7 @@ cargo install --path cli
 git clone https://github.com/Zackriya-Solutions/syncfu.git
 cd syncfu
 pnpm install
-cargo tauri build
+pnpm tauri build
 ```
 
 > **Prerequisites:** [Rust](https://rustup.rs/), [Node.js](https://nodejs.org/) 18+, [pnpm](https://pnpm.io/), and [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/).
@@ -165,9 +165,6 @@ See [CHEATSHEET.md](CHEATSHEET.md) for a quick-reference of all CLI commands and
 ## Quick start
 
 ```bash
-# Start syncfu (it lives in your system tray)
-syncfu
-
 # Send your first notification — just a message
 syncfu send "Hello from syncfu!"
 
@@ -621,7 +618,7 @@ syncfu is open source under the MIT license. Contributions welcome.
 git clone https://github.com/Zackriya-Solutions/syncfu.git
 cd syncfu
 pnpm install
-cargo tauri dev
+pnpm tauri dev
 ```
 
 **Prerequisites:** Rust 1.75+, Node.js 18+, pnpm, [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/)
