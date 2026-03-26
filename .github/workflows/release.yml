@@ -119,10 +119,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: desktop/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install frontend deps
-        working-directory: desktop
         run: pnpm install --frozen-lockfile
 
       - name: Install Linux dependencies
@@ -136,7 +135,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: desktop
+          projectPath: .
           tauriScript: pnpm tauri
           args: ${{ matrix.args }}
           tagName: ${{ github.ref_name }}
