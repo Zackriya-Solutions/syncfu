@@ -1,0 +1,202 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  # --- Build CLI binaries for all platforms ---
+  build-cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            artifact: syncfu-darwin-arm64
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            artifact: syncfu-darwin-x86_64
+            os: macos-latest
+          - target: x86_64-unknown-linux-gnu
+            artifact: syncfu-linux-x86_64
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            artifact: syncfu-linux-arm64
+            os: ubuntu-latest
+          - target: x86_64-pc-windows-gnu
+            artifact: syncfu-windows-x86_64.exe
+            os: ubuntu-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cli-${{ matrix.target }}
+
+      - name: Install cargo-zigbuild and cross-compile deps
+        if: runner.os == 'Linux'
+        run: |
+          pip3 install ziglang
+          cargo install cargo-zigbuild --version 0.19.8 --locked
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
+
+      - name: Install ARM64 cross-linker
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu cmake libclang-dev
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - name: Build CLI (cross-compile via zigbuild)
+        if: runner.os == 'Linux'
+        run: cargo zigbuild --release -p syncfu-cli --target ${{ matrix.target }}
+
+      - name: Build CLI (native)
+        if: runner.os != 'Linux'
+        run: cargo build --release -p syncfu-cli --target ${{ matrix.target }}
+
+      - name: Rename binary
+        run: |
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            cp target/${{ matrix.target }}/release/syncfu.exe ${{ matrix.artifact }}
+          else
+            cp target/${{ matrix.target }}/release/syncfu ${{ matrix.artifact }}
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  # --- Build desktop app for macOS, Windows, Linux ---
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            args: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ""
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-${{ matrix.target }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        working-directory: desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build desktop app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "syncfu ${{ github.ref_name }}"
+          releaseBody: ""
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: false
+
+  # --- Collect all artifacts into a single release ---
+  release:
+    needs: [build-cli, build-desktop]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          merge-multiple: true
+          path: cli-artifacts
+
+      - name: Generate checksums for CLI binaries
+        working-directory: cli-artifacts
+        run: sha256sum syncfu-* > checksums.txt
+
+      - name: Upload CLI artifacts to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # Wait for tauri-action to create the draft release
+          sleep 10
+          RELEASE_ID=$(gh api repos/${{ github.repository }}/releases --jq ".[] | select(.tag_name==\"${TAG}\") | .id" | head -1)
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Release not found for tag ${TAG}, creating..."
+            gh release create "${TAG}" --repo "${{ github.repository }}" --draft --title "syncfu ${TAG}"
+          fi
+          gh release upload "${TAG}" cli-artifacts/* --repo "${{ github.repository }}" --clobber
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release edit "${TAG}" --repo "${{ github.repository }}" --draft=false \
+            --notes "## Install
+
+          **macOS / Linux (one command):**
+          \`\`\`sh
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | sh
+          \`\`\`
+
+          **Windows (PowerShell):**
+          \`\`\`powershell
+          irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex
+          \`\`\`
+
+          ## What's included
+          - **Desktop app** — tray icon, overlay notifications, HTTP server on port 9868
+          - **CLI** — \`syncfu send \"hello\"\` from any terminal or AI agent
+
+          ## Changes
+          See commit history for details."

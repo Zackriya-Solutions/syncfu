@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicosujith/tauri-v2-schema/main/tauri.conf.json",
   "productName": "syncfu",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "dev.syncfu.app",
   "build": {
     "frontendDist": "../dist",

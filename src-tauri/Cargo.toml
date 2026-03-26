@@ -1,6 +1,6 @@
 [package]
 name = "syncfu"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Universal overlay notification system for AI agents and background processes"
 license = "MIT"

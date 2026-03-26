@@ -1,6 +1,6 @@
 [package]
 name = "syncfu-cli"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "CLI for syncfu — send notifications from anywhere"
 license = "MIT"
