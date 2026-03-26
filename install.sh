@@ -105,7 +105,7 @@ fi
 # --- Verify checksum ---
 info "Verifying checksum..."
 if curl -fsSL -o "${WORK_DIR}/checksums.txt" "$CHECKSUM_URL" 2>/dev/null; then
-  EXPECTED=$(grep "${ARTIFACT}" "${WORK_DIR}/checksums.txt" | awk '{print $1}')
+  EXPECTED=$(grep -F "${ARTIFACT}" "${WORK_DIR}/checksums.txt" | awk '{print $1}')
   if [ -n "$EXPECTED" ]; then
     if command -v sha256sum >/dev/null 2>&1; then
       ACTUAL=$(sha256sum "${WORK_DIR}/${BINARY_NAME}" | awk '{print $1}')

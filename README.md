@@ -82,6 +82,8 @@ curl -fsSL https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/inst
 
 ### From source
 ```bash
+git clone https://github.com/Zackriya-Solutions/syncfu.git
+cd syncfu
 cargo install --path cli
 ```
 
