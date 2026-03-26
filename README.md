@@ -13,8 +13,8 @@ syncfu send "All 47 tests passing."
 Need a decision from the user? Add `--wait` and the CLI blocks until they click.
 
 ```bash
-syncfu send -t "Deploy?" -a "yes:Yes" -a "no:No:danger" \
-  --wait "Ship to production?"
+syncfu send "Ship to production?" -t "Deploy?" \
+  -a "yes:Yes" -a "no:No:danger" --wait
 # stdout: "yes" or "no", exit 0. Dismissed = exit 1. Timeout = exit 2.
 ```
 
@@ -44,48 +44,27 @@ syncfu is that layer.
 
 syncfu runs as a **system tray app** with two faces:
 
-1. **Overlay** — an invisible, always-on-top layer across your screen. When a notification arrives (via HTTP or WebSocket), it slides in from the right with action buttons, progress bars, markdown content — whatever you sent. Clicks pass through to your apps underneath. Only the notification cards are interactive.
+1. **Overlay** — an invisible, always-on-top layer across your screen. When a notification arrives via HTTP, it slides in from the top-right with action buttons, progress bars, and custom styling. Clicks pass through to your apps underneath. Only the notification cards are interactive. Follows your mouse cursor across monitors.
 
-2. **Desktop app** — a standard window you can open from the tray icon (or dock on macOS). Shows your full **notification history** — searchable, filterable by sender/priority/date. Click any entry to see the full markdown body, which actions were taken, and callback results. Think of it as your notification inbox.
+2. **System tray** — syncfu lives in your menu bar / system tray. Open the main window to see active notifications, or quit from the tray menu.
 
 ```
 Your App ──HTTP POST──▸ syncfu server ──▸ Overlay Notification
-Your App ──WebSocket──▸ syncfu server ──▸ Overlay Notification ──▸ History (persisted)
 CLI      ──HTTP POST──▸ syncfu server ──▸ Overlay Notification
-                                    │
-                            Open syncfu app → browse full history
+CLI (--wait) ─────────▸ SSE stream ◂──── wait for action/dismiss
 ```
 
-### Ports
+### Port
 
 | Protocol | Port | Purpose |
 |----------|------|---------|
-| HTTP REST | `9868` | Send, update, dismiss notifications |
-| WebSocket | `9869` | Bidirectional — send notifications, receive action callbacks (planned) |
+| HTTP REST | `9868` | Send, update, dismiss, wait (SSE) |
 
 ---
 
 ## Install
 
-### macOS
-```bash
-brew install --cask syncfu
-```
-
-### Linux
-```bash
-# Debian/Ubuntu
-curl -fsSL https://syncfu.dev/install.sh | sh
-
-# Or grab the .AppImage from releases
-```
-
-### Windows
-```bash
-winget install syncfu
-```
-
-### From source
+### From source (recommended)
 ```bash
 git clone https://github.com/nicosujith/syncfu.git
 cd syncfu
@@ -93,9 +72,10 @@ pnpm install
 cargo tauri build
 ```
 
-### CLI
+### CLI only
 ```bash
-cargo install syncfu-cli
+cd cli
+cargo install --path .
 ```
 
 ---
@@ -199,7 +179,7 @@ syncfu send -t "Build passed" -s github-actions -i circle-check \
 ```
 
 **Deploy progress**
-Track multi-stage deployments with live progress bars that update in real-time via WebSocket.
+Track multi-stage deployments with live progress bars that update in real-time via the update endpoint.
 
 **Infrastructure alerts**
 Disk full, memory pressure, certificate expiring, container restart loop — get an overlay notification instead of an email you'll read tomorrow.
@@ -293,7 +273,7 @@ Your nightly backup, database vacuum, or log rotation finished (or failed). Know
 ### Data & ML pipelines
 
 **Training run progress**
-Long-running ML training jobs report epoch progress, loss curves (as text), and ETA via WebSocket. Get notified at milestones or when training completes.
+Long-running ML training jobs report epoch progress, loss curves (as text), and ETA. Get notified at milestones or when training completes.
 
 ```bash
 syncfu send -t "Epoch 45/100" -s training --progress 0.45 --group training-run-7 \
@@ -363,38 +343,15 @@ Audio file finished transcribing, podcast episode processed, video subtitles gen
 
 ---
 
-## Desktop app
+## System tray
 
-Open syncfu from the system tray or dock to see your notification history — every notification that's ever been sent, searchable and filterable.
+syncfu lives in your system tray (menu bar on macOS). From the tray you can:
 
-```
-┌─────────────────────────────────────────────────────┐
-│  syncfu                                      ─ □ ✕  │
-├──────────┬──────────────────────────────────────────┤
-│          │  [Search...]  [Sender ▾]  [Priority ▾]   │
-│ History  │  [Today] [7d] [30d] [All]                │
-│          │                                          │
-│ ──────── │  🟢 ci-pipeline    Build passed    2m ago│
-│          │  🔴 test-watcher   3 tests fail   14m ago│
-│ Settings │  🟡 remind         Stand-up in 5m  1h ago│
-│ (soon)   │  ⚪ deploy          v2.3.1 live    3h ago│
-│          │                                          │
-│          │  ── Detail ──────────────────────────     │
-│          │  Build passed — ci-pipeline               │
-│          │  main built in 3m 42s                     │
-│          │  - 142 tests passed                       │
-│          │  - Coverage: 87%                          │
-│          │  Action taken: "Open PR" at 14:32         │
-└──────────┴──────────────────────────────────────────┘
-```
+- **Open** the main window to see active notifications
+- **Clear all** notifications
+- **Quit** syncfu (with confirmation)
 
-**Features:**
-- Full history of all notifications, persisted in SQLite
-- Filter by sender, priority level, date range
-- Full-text search across title, body, and sender
-- Click any row to see full markdown body and action/callback details
-- Real-time: new notifications appear at the top while the app is open
-- Closing the window hides it — syncfu keeps running in the tray
+Closing the main window hides it — syncfu keeps running in the tray. The overlay stays active.
 
 ---
 
@@ -420,7 +377,7 @@ Open syncfu from the system tray or dock to see your notification history — ev
   "sender": "my-app",
   "title": "Build Complete",
   "body": "**main** built in 3m 42s\n- 142 tests passed",
-  "icon": "https://github.com/favicon.ico",
+  "icon": "circle-check",
   "priority": "normal",
   "timeout": { "seconds": 15 },
   "actions": [
@@ -439,16 +396,16 @@ Open syncfu from the system tray or dock to see your notification history — ev
 |-------|------|----------|-------------|
 | `sender` | string | yes | Identifier for the sending process |
 | `title` | string | yes | Notification title |
-| `body` | string | yes | Body text (supports markdown) |
+| `body` | string | yes | Body text (plain text) |
 | `icon` | string | no | Lucide icon name (e.g. `phone`, `git-pull-request`, `bell`) |
 | `font` | string | no | Google Font name (e.g. `Space Grotesk`, `JetBrains Mono`) — loaded on demand |
 | `priority` | string | no | `low`, `normal` (default), `high`, `critical` |
 | `timeout` | object | no | `{"seconds": N}` or `"never"` or `"default"` (auto by priority) |
 | `actions` | array | no | Up to 3 action buttons |
 | `progress` | object | no | Progress bar (`bar` or `ring` style) |
-| `group` | string | no | Group key — notifications with same group stack together |
+| `group` | string | no | Group key (tracked, grouping UI planned) |
 | `theme` | string | no | `light` or `dark` (auto-follows system by default) |
-| `sound` | string | no | `default`, `success`, `error`, or `none` |
+| `sound` | string | no | Sound name (accepted, playback planned) |
 | `callback_url` | string | no | URL to POST when an action button is clicked |
 | `style` | object | no | Per-notification style overrides (see below) |
 
@@ -496,10 +453,6 @@ Each action button can override its own colors:
     }
   ]
 }
-
-### WebSocket protocol (planned)
-
-Bidirectional communication on port `9869`. Not yet implemented.
 
 ---
 
@@ -594,42 +547,21 @@ requests.post('http://localhost:9868/notify', json={
 
 ---
 
-## Configuration
+## Customization
 
-syncfu stores settings in `{app_data_dir}/syncfu/settings.json`:
+syncfu doesn't use config files — everything is controlled per-notification via the API.
 
-```json
-{
-  "http_port": 9868,
-  "ws_port": 9869,
-  "position": "top-right",
-  "max_visible": 5,
-  "default_timeout_seconds": 8,
-  "sounds_enabled": true,
-  "do_not_disturb": false,
-  "history_max_rows": 10000
-}
+**Per-notification styling** — override any of 27 CSS properties via the `style` field:
+```bash
+syncfu send -t "Custom" --style-json '{"accentColor":"#22c55e","cardBg":"rgba(10,40,20,0.96)"}' "Styled notification"
 ```
 
----
-
-## Custom themes
-
-Send a `theme` field to apply custom styling per sender:
-
-```css
-/* Place in ~/.config/syncfu/themes/github-dark.css */
-.notification-card.github-dark {
-  background: #161b22;
-  border: 1px solid #30363d;
-  color: #e6edf3;
-}
-.notification-card.github-dark .action-button.primary {
-  background: #238636;
-}
+**Google Fonts** — load any Google Font on demand:
+```bash
+syncfu send -t "Fancy" --font "Space Grotesk" "With a custom font"
 ```
 
-Then use `"theme": "github-dark"` in your notification payload.
+**Light/dark theme** — auto-follows system by default, or set per-notification with `"theme": "dark"`.
 
 ---
 
@@ -649,7 +581,6 @@ Then use `"theme": "github-dark"` in your notification payload.
 - [x] Relative timestamps ("just now", "5m ago")
 - [x] Priority-tinted icon containers
 - [x] Dynamic panel resize (no click-blocking)
-- [x] 154 tests (72 frontend + 56 Rust + 26 CLI)
 - [x] Webhook callbacks (action buttons POST to `callbackUrl`)
 - [x] Per-notification style overrides (27 customizable properties)
 - [x] Per-action button styling (bg, color, borderColor, icon)
@@ -657,14 +588,13 @@ Then use `"theme": "github-dark"` in your notification payload.
 - [x] CLI `--wait` flag (SSE-based blocking until action/dismiss/timeout)
 - [x] Multi-monitor support (notification follows mouse cursor)
 - [x] 181 tests (72 frontend + 70 Rust server + 29 CLI unit + 10 CLI integration)
-- [ ] Click-through mechanism
-- [ ] WebSocket server (port 9869)
+- [x] Click-through (overlay transparent, only cards interactive)
 - [ ] Markdown body rendering
-- [ ] Notification grouping
 - [ ] Sound playback
-- [ ] SQLite history
+- [ ] Notification grouping UI
+- [ ] Persistent history (SQLite)
 - [ ] Linux Wayland support
-- [ ] Plugin SDK (custom notification templates)
+- [ ] Configuration file
 - [ ] Encrypted transport (mTLS / API keys)
 - [ ] Remote notifications (tunnel / cloud relay)
 
