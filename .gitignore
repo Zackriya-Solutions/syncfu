@@ -18,10 +18,12 @@ cli/target/
 *.swp
 *.swo
 .DS_Store
-
+/.claude/
 # Test / coverage
 coverage/
 html/
+research/
+target/
 
 # Logs
 *.log
