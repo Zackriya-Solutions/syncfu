@@ -263,11 +263,11 @@ case ":${PATH:-}:" in
     if [ -n "$RC_FILE" ] && [ -f "$RC_FILE" ]; then
       printf 'export PATH="%s:$PATH"\n' "$CLI_DIR" >> "$RC_FILE"
       export PATH="${CLI_DIR}:${PATH}"
-      info "Added ${CLI_DIR} to PATH (${RC_FILE})"
+      info "Added ${CLI_DIR} to PATH (${RC_FILE}). Open a new terminal to use syncfu."
     elif [ "$SHELL_NAME" = "fish" ]; then
       fish -c "fish_add_path $CLI_DIR" 2>/dev/null || true
       export PATH="${CLI_DIR}:${PATH}"
-      info "Added ${CLI_DIR} to PATH (fish)"
+      info "Added ${CLI_DIR} to PATH (fish). Open a new terminal to use syncfu."
     else
       export PATH="${CLI_DIR}:${PATH}"
       printf "\n"
