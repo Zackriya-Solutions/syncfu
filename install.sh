@@ -52,6 +52,9 @@ esac
 
 ARTIFACT="${BINARY_NAME}-${OS_NAME}-${ARCH_NAME}"
 
+# --- Require curl ---
+command -v curl >/dev/null 2>&1 || error "curl is required but not installed. Install it with your package manager."
+
 # --- Resolve version ---
 if [ -z "$VERSION" ]; then
   info "Resolving latest version..."
@@ -62,6 +65,12 @@ if [ -z "$VERSION" ]; then
     error "Could not determine latest version. Try: --version=0.2.0"
   fi
 fi
+
+# --- Validate version format ---
+case "$VERSION" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) error "Unexpected version format: $VERSION" ;;
+esac
 
 # --- Install directory ---
 if [ -n "${SYNCFU_INSTALL_DIR:-}" ]; then
@@ -76,8 +85,8 @@ fi
 URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARTIFACT}"
 CHECKSUM_URL="https://github.com/${REPO}/releases/download/v${VERSION}/checksums.txt"
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/syncfu-install.XXXXXXXXXX")
+trap 'rm -rf "$WORK_DIR"' EXIT
 
 printf "\n"
 printf "  ${BOLD}syncfu${RESET} installer\n"
@@ -88,28 +97,30 @@ printf "  ${CYAN}Install:${RESET}  %s\n" "$INSTALL_DIR"
 printf "\n"
 
 info "Downloading syncfu v${VERSION}..."
-HTTP_CODE=$(curl -fsSL -w '%{http_code}' -o "${TMPDIR}/${BINARY_NAME}" "$URL" 2>/dev/null || true)
-if [ ! -f "${TMPDIR}/${BINARY_NAME}" ] || [ "$(wc -c < "${TMPDIR}/${BINARY_NAME}" | tr -d ' ')" -lt 1000 ]; then
+HTTP_CODE=$(curl -sL -w '%{http_code}' -o "${WORK_DIR}/${BINARY_NAME}" "$URL" 2>/dev/null || true)
+if [ "$HTTP_CODE" != "200" ]; then
   error "Download failed (HTTP ${HTTP_CODE:-???}). Check: https://github.com/${REPO}/releases/tag/v${VERSION}"
 fi
 
 # --- Verify checksum ---
 info "Verifying checksum..."
-if curl -fsSL -o "${TMPDIR}/checksums.txt" "$CHECKSUM_URL" 2>/dev/null; then
-  EXPECTED=$(grep "${ARTIFACT}" "${TMPDIR}/checksums.txt" | awk '{print $1}')
+if curl -fsSL -o "${WORK_DIR}/checksums.txt" "$CHECKSUM_URL" 2>/dev/null; then
+  EXPECTED=$(grep "${ARTIFACT}" "${WORK_DIR}/checksums.txt" | awk '{print $1}')
   if [ -n "$EXPECTED" ]; then
     if command -v sha256sum >/dev/null 2>&1; then
-      ACTUAL=$(sha256sum "${TMPDIR}/${BINARY_NAME}" | awk '{print $1}')
+      ACTUAL=$(sha256sum "${WORK_DIR}/${BINARY_NAME}" | awk '{print $1}')
     elif command -v shasum >/dev/null 2>&1; then
-      ACTUAL=$(shasum -a 256 "${TMPDIR}/${BINARY_NAME}" | awk '{print $1}')
+      ACTUAL=$(shasum -a 256 "${WORK_DIR}/${BINARY_NAME}" | awk '{print $1}')
     else
-      warn "No sha256sum or shasum found, skipping checksum verification"
-      ACTUAL="$EXPECTED"
+      warn "No sha256sum or shasum found — cannot verify download integrity"
+      EXPECTED=""
     fi
-    if [ "$EXPECTED" != "$ACTUAL" ]; then
+    if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
       error "Checksum mismatch!\n  Expected: ${EXPECTED}\n  Got:      ${ACTUAL}"
     fi
-    info "Checksum verified"
+    if [ -n "$EXPECTED" ]; then
+      info "Checksum verified"
+    fi
   else
     warn "Artifact not found in checksums.txt, skipping verification"
   fi
@@ -118,15 +129,15 @@ else
 fi
 
 # --- Install ---
-chmod +x "${TMPDIR}/${BINARY_NAME}"
+chmod +x "${WORK_DIR}/${BINARY_NAME}"
 
 # Remove macOS quarantine attribute
 if [ "$OS_NAME" = "darwin" ]; then
-  xattr -d com.apple.quarantine "${TMPDIR}/${BINARY_NAME}" 2>/dev/null || true
+  xattr -d com.apple.quarantine "${WORK_DIR}/${BINARY_NAME}" 2>/dev/null || true
 fi
 
 mkdir -p "$INSTALL_DIR"
-mv "${TMPDIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
+mv "${WORK_DIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
 
 info "Installed to ${INSTALL_DIR}/${BINARY_NAME}"
 
