@@ -1,98 +1,13 @@
-name: Release CLI
+# Superseded by release.yml which builds both desktop app and CLI.
+# This file is kept for reference only — it does not run.
+#
+# To build CLI-only releases (e.g., for CI/headless), use:
+#   workflow_dispatch on release.yml with cli-only flag (future enhancement)
+name: "[deprecated] Release CLI Only"
 
 on:
-  push:
-    tags: ['v*']
-
-permissions:
-  contents: write
-
-jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            artifact: syncfu-darwin-arm64
-            os: macos-latest
-          - target: x86_64-apple-darwin
-            artifact: syncfu-darwin-x86_64
-            os: macos-latest
-          - target: x86_64-unknown-linux-gnu
-            artifact: syncfu-linux-x86_64
-            os: ubuntu-latest
-          - target: aarch64-unknown-linux-gnu
-            artifact: syncfu-linux-arm64
-            os: ubuntu-latest
-          - target: x86_64-pc-windows-gnu
-            artifact: syncfu-windows-x86_64.exe
-            os: ubuntu-latest
-
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # v2.7.3
-        with:
-          key: ${{ matrix.target }}
-
-      - name: Install cargo-zigbuild and cross-compile deps
-        if: runner.os == 'Linux'
-        run: |
-          pip3 install ziglang
-          cargo install cargo-zigbuild --version 0.19.8 --locked
-          sudo apt-get update
-          sudo apt-get install -y mingw-w64
-
-      - name: Install ARM64 cross-linker
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu cmake libclang-dev
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-
-      - name: Build CLI (cross-compile via zigbuild)
-        if: runner.os == 'Linux'
-        run: cargo zigbuild --release -p syncfu-cli --target ${{ matrix.target }}
-
-      - name: Build CLI (native)
-        if: runner.os != 'Linux'
-        run: cargo build --release -p syncfu-cli --target ${{ matrix.target }}
-
-      - name: Rename binary
-        run: |
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            cp target/${{ matrix.target }}/release/syncfu.exe ${{ matrix.artifact }}
-          else
-            cp target/${{ matrix.target }}/release/syncfu ${{ matrix.artifact }}
-          fi
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          merge-multiple: true
-
-      - name: Generate checksums
-        run: sha256sum syncfu-* > checksums.txt
-
-      - name: Create release
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
-        with:
-          generate_release_notes: true
-          files: |
-            syncfu-*
-            checksums.txt
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "Deprecated — use the main release.yml workflow instead"
+        required: false
