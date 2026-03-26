@@ -64,11 +64,11 @@ if [ -z "$VERSION" ]; then
   info "Resolving latest version..."
   LOCATION_HEADER=$(curl -sI "https://github.com/${REPO}/releases/latest" 2>/dev/null | grep -i '^location:' || true)
   if [ -z "$LOCATION_HEADER" ]; then
-    error "Could not determine latest version. Try: --version=0.2.0"
+    error "Could not determine latest version. Try: --version=X.Y.Z"
   fi
-  VERSION=$(printf '%s' "$LOCATION_HEADER" | sed 's|.*/v||' | tr -d '\r')
+  VERSION=$(printf '%s' "$LOCATION_HEADER" | sed 's|.*/||' | sed 's/^v//' | tr -d '\r')
   if [ -z "$VERSION" ]; then
-    error "Could not parse version from redirect. Try: --version=0.2.0"
+    error "Could not parse version from redirect. Try: --version=X.Y.Z"
   fi
 fi
 
@@ -98,7 +98,7 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 CLI_ARTIFACT="${APP_NAME}-${OS_NAME}-${ARCH_NAME}"
 
 if [ "$OS_NAME" = "darwin" ]; then
-  # Tauri produces: syncfu_0.2.0_aarch64.dmg / syncfu_0.2.0_x86_64.dmg
+  # Tauri produces: syncfu_X.Y.Z_aarch64.dmg / syncfu_X.Y.Z_x86_64.dmg
   if [ "$ARCH_NAME" = "arm64" ]; then
     TAURI_ARCH="aarch64"
   else
@@ -323,15 +323,13 @@ if [ "$CLI_ONLY" = "0" ]; then
   printf "  The desktop app runs in the system tray. Notifications appear\n"
   printf "  as overlay panels — no focus stealing, works across all Spaces.\n"
 else
-  printf "  ${BOLD}syncfu CLI installed (headless mode).${RESET}\n"
+  printf "  ${BOLD}syncfu CLI installed.${RESET}\n"
   printf "\n"
-  printf "  ${CYAN}Start the server:${RESET}\n"
-  printf "    syncfu serve\n"
-  printf "\n"
-  printf "  ${CYAN}Send a notification:${RESET}\n"
+  printf "  ${CYAN}Quick test:${RESET}\n"
   printf "    syncfu send \"Hello from syncfu!\"\n"
   printf "\n"
-  printf "  For overlay notifications, install the desktop app:\n"
+  printf "  ${YELLOW}Note:${RESET} The CLI requires the desktop app running as the server.\n"
+  printf "  Install the desktop app for overlay notifications:\n"
   printf "    curl -fsSL https://syncfu.dev/install.sh | sh\n"
 fi
 printf "\n"

@@ -24,7 +24,7 @@ if (-not $Version) {
     if (-not $RedirectUrl) {
         $Release = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest"
         $Version = $Release.tag_name -replace '^v', ''
-    } elseif ($RedirectUrl -match '/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+)') {
+    } elseif ($RedirectUrl -match '/releases/tag/v?([0-9]+\.[0-9]+\.[0-9]+)') {
         $Version = $Matches[1]
     } else {
         Write-Host "error " -ForegroundColor Red -NoNewline
@@ -183,13 +183,13 @@ try {
         Write-Host "  Quick test:" -ForegroundColor Cyan
         Write-Host '    syncfu send "Hello from syncfu!"'
     } else {
-        Write-Host "  syncfu CLI installed (headless mode)." -ForegroundColor White
+        Write-Host "  syncfu CLI installed." -ForegroundColor White
         Write-Host ""
-        Write-Host "  Start the server:" -ForegroundColor Cyan
-        Write-Host "    syncfu serve"
-        Write-Host ""
-        Write-Host "  Send a notification:" -ForegroundColor Cyan
+        Write-Host "  Quick test:" -ForegroundColor Cyan
         Write-Host '    syncfu send "Hello from syncfu!"'
+        Write-Host ""
+        Write-Host "  Note: The CLI requires the desktop app running as the server." -ForegroundColor Yellow
+        Write-Host "  Re-run this installer without -CliOnly for desktop app."
     }
     Write-Host ""
     Write-Host "info  " -ForegroundColor Green -NoNewline
