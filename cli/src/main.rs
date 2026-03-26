@@ -1,6 +1,7 @@
 mod client;
 mod output;
 mod types;
+mod wait;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -92,6 +93,14 @@ enum Commands {
         /// Style overrides as JSON
         #[arg(long)]
         style_json: Option<String>,
+
+        /// Wait for user to click an action or dismiss the notification
+        #[arg(short, long)]
+        wait: bool,
+
+        /// Timeout in seconds when using --wait (default: 300)
+        #[arg(long, default_value = "300")]
+        wait_timeout: u64,
     },
 
     /// Update an existing notification
@@ -177,6 +186,8 @@ async fn run(cli: Cli, client: &SyncfuClient) -> Result<()> {
             font: _,
             callback_url,
             style_json,
+            wait,
+            wait_timeout,
         } => {
             let parsed_actions: Vec<Action> = actions
                 .iter()
@@ -213,6 +224,18 @@ async fn run(cli: Cli, client: &SyncfuClient) -> Result<()> {
 
             let resp = client.send_notification(&req).await?;
             output::print_send_result(&resp, cli.json);
+
+            if wait {
+                let result =
+                    wait::wait_for_resolution(&cli.server, &resp.id, wait_timeout).await?;
+                output::print_wait_result(&result, cli.json);
+                let exit_code = match result {
+                    types::WaitResult::Action(_) => 0,
+                    types::WaitResult::Dismissed => 1,
+                    types::WaitResult::Timeout => 2,
+                };
+                std::process::exit(exit_code);
+            }
         }
 
         Commands::Update {

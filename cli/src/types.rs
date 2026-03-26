@@ -224,6 +224,28 @@ pub struct WebhookResult {
     pub error: Option<String>,
 }
 
+// -- Wait types (for --wait mode) --
+
+/// SSE event received from the server during --wait mode.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(tag = "event", rename_all = "lowercase")]
+pub enum WaitEvent {
+    Connected,
+    Action { action_id: String },
+    Dismissed,
+}
+
+/// Outcome of a --wait operation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum WaitResult {
+    /// User clicked an action button. Contains the action_id.
+    Action(String),
+    /// Notification was dismissed (X button or server-side timeout).
+    Dismissed,
+    /// CLI-side timeout expired.
+    Timeout,
+}
+
 /// Parse "id:label:style" action spec. Style defaults to "primary".
 pub fn parse_action_spec(spec: &str) -> Result<Action, String> {
     let parts: Vec<&str> = spec.splitn(3, ':').collect();
@@ -403,5 +425,29 @@ mod tests {
         let json = serde_json::to_string(&style).unwrap();
         assert!(json.contains("accentColor"));
         assert!(!json.contains("cardBg"));
+    }
+
+    #[test]
+    fn test_wait_event_deserialize_connected() {
+        let event: WaitEvent = serde_json::from_str(r#"{"event":"connected"}"#).unwrap();
+        assert_eq!(event, WaitEvent::Connected);
+    }
+
+    #[test]
+    fn test_wait_event_deserialize_action() {
+        let event: WaitEvent =
+            serde_json::from_str(r#"{"event":"action","action_id":"deploy"}"#).unwrap();
+        assert_eq!(
+            event,
+            WaitEvent::Action {
+                action_id: "deploy".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_wait_event_deserialize_dismissed() {
+        let event: WaitEvent = serde_json::from_str(r#"{"event":"dismissed"}"#).unwrap();
+        assert_eq!(event, WaitEvent::Dismissed);
     }
 }

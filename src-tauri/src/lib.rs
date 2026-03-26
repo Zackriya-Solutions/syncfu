@@ -8,8 +8,9 @@ use std::sync::Arc;
 use log::{error, info};
 use notification::manager::NotificationManager;
 use notification::types::{NotificationPayload, NotificationUpdate, Priority, Timeout};
-use server::webhook::{self, WebhookPayload, WebhookResult};
 use server::http::ServerState;
+use server::waiters::{WaitEvent, WaiterRegistry};
+use server::webhook::{self, WebhookPayload, WebhookResult};
 use tauri::{Emitter, Manager};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
 
@@ -35,11 +36,15 @@ async fn notify(
 #[tauri::command]
 async fn dismiss_notification(
     manager: tauri::State<'_, Arc<NotificationManager>>,
+    waiters: tauri::State<'_, Arc<WaiterRegistry>>,
     id: String,
     app: tauri::AppHandle,
 ) -> Result<bool, String> {
     let dismissed = manager.dismiss(&id).await;
     if dismissed.is_some() {
+        // Notify waiting CLI clients
+        waiters.notify(&id, WaitEvent::Dismissed).await;
+
         app.emit("notification:dismiss", &id)
             .map_err(|e| e.to_string())?;
         // Hide panel if no more active notifications
@@ -53,8 +58,12 @@ async fn dismiss_notification(
 #[tauri::command]
 async fn dismiss_all(
     manager: tauri::State<'_, Arc<NotificationManager>>,
+    waiters: tauri::State<'_, Arc<WaiterRegistry>>,
     app: tauri::AppHandle,
 ) -> Result<usize, String> {
+    // Notify all waiting CLI clients before clearing
+    waiters.notify_all(WaitEvent::Dismissed).await;
+
     let dismissed = manager.dismiss_all().await;
     let count = dismissed.len();
     overlay::panel::hide_panel(&app);
@@ -100,6 +109,7 @@ async fn health(
 #[tauri::command]
 async fn action_callback(
     manager: tauri::State<'_, Arc<NotificationManager>>,
+    waiters: tauri::State<'_, Arc<WaiterRegistry>>,
     notification_id: String,
     action_id: String,
     app: tauri::AppHandle,
@@ -125,6 +135,16 @@ async fn action_callback(
             error: None,
         }
     };
+
+    // Notify waiting CLI clients
+    waiters
+        .notify(
+            &notification_id,
+            WaitEvent::Action {
+                action_id: action_id.clone(),
+            },
+        )
+        .await;
 
     // Dismiss after action regardless of webhook result
     let dismissed = manager.dismiss(&notification_id).await;
@@ -191,6 +211,7 @@ pub fn run() {
     }));
 
     let manager = NotificationManager::new();
+    let waiters = WaiterRegistry::new();
 
     #[cfg(debug_assertions)]
     let log_targets = vec![
@@ -223,7 +244,8 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .manage(manager);
+        .manage(manager)
+        .manage(waiters.clone());
 
     // Register tauri-nspanel plugin on macOS for NSPanel support
     #[cfg(target_os = "macos")]
@@ -258,8 +280,10 @@ pub fn run() {
             // Start HTTP server on port 9868
             info!("Starting HTTP server on port 9868");
             let manager = app.state::<Arc<NotificationManager>>().inner().clone();
+            let waiters = app.state::<Arc<WaiterRegistry>>().inner().clone();
             let server_state = ServerState {
                 manager,
+                waiters,
                 app_handle: Some(app.handle().clone()),
             };
             tauri::async_runtime::spawn(async move {

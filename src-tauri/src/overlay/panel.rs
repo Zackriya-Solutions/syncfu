@@ -74,7 +74,9 @@ pub fn calculate_panel_position(monitor: MonitorInfo) -> PanelPosition {
 /// On other platforms, creates a standard WebviewWindow with always-on-top.
 /// The panel starts hidden and should be shown when the first notification arrives.
 pub fn create_panel(app: &AppHandle) -> Result<(), String> {
-    let position = match get_monitor_info(app) {
+    let position = match get_cursor_monitor_info(app)
+        .or_else(|| get_primary_monitor_info(app))
+    {
         Some(monitor) => calculate_panel_position(monitor),
         None => {
             info!("No monitor info — using default panel position");
@@ -177,12 +179,32 @@ fn create_standard_panel(
 
 /// Show the panel window (e.g. when a notification arrives).
 ///
+/// Repositions the panel to the monitor where the mouse cursor is,
+/// then shows it. This ensures notifications appear on the active display.
+///
 /// IMPORTANT: On macOS, NSPanel operations MUST run on the main thread.
 /// This function dispatches to the main thread to avoid crashes.
 pub fn show_panel(app: &AppHandle) {
+    // Calculate position for the monitor under the cursor BEFORE dispatching
+    // to the main thread (monitor queries work from any thread).
+    let position = get_cursor_monitor_info(app)
+        .or_else(|| get_primary_monitor_info(app))
+        .map(|m| calculate_panel_position(m));
+
     let handle = app.clone();
     let inner = app.clone();
     let _ = handle.run_on_main_thread(move || {
+        // Reposition the overlay window to the cursor's monitor.
+        // The underlying WebviewWindow is used for positioning on all platforms,
+        // since NSPanel doesn't expose set_position directly.
+        if let Some(pos) = position {
+            if let Some(window) = inner.get_webview_window("overlay") {
+                let _ = window.set_position(tauri::Position::Logical(
+                    tauri::LogicalPosition::new(pos.x, pos.y),
+                ));
+            }
+        }
+
         #[cfg(target_os = "macos")]
         {
             if let Ok(panel) = inner.get_webview_panel("overlay") {
@@ -219,8 +241,68 @@ pub fn hide_panel(app: &AppHandle) {
     });
 }
 
-/// Extract monitor info from the primary monitor.
-fn get_monitor_info(app: &AppHandle) -> Option<MonitorInfo> {
+/// Find the monitor containing the mouse cursor and return its info.
+///
+/// Iterates all available monitors and checks which one contains the
+/// current cursor position. Falls back to None if cursor position
+/// can't be determined or no monitor matches.
+fn get_cursor_monitor_info(app: &AppHandle) -> Option<MonitorInfo> {
+    let cursor_pos = get_cursor_position()?;
+    let monitors = app.available_monitors().ok()?;
+
+    for monitor in monitors {
+        let pos = monitor.position();
+        let size = monitor.size();
+
+        let left = pos.x as f64;
+        let top = pos.y as f64;
+        let right = left + size.width as f64;
+        let bottom = top + size.height as f64;
+
+        if cursor_pos.0 >= left
+            && cursor_pos.0 < right
+            && cursor_pos.1 >= top
+            && cursor_pos.1 < bottom
+        {
+            info!(
+                "Cursor at ({}, {}) is on monitor at ({}, {}), size {}x{}",
+                cursor_pos.0, cursor_pos.1, pos.x, pos.y, size.width, size.height
+            );
+            return Some(MonitorInfo {
+                x: pos.x as f64,
+                y: pos.y as f64,
+                width: size.width as f64,
+                height: size.height as f64,
+                scale_factor: monitor.scale_factor(),
+            });
+        }
+    }
+
+    info!("Cursor at ({}, {}) — no matching monitor found", cursor_pos.0, cursor_pos.1);
+    None
+}
+
+/// Get the current mouse cursor position in physical pixels.
+/// Returns (x, y) or None if unavailable.
+#[cfg(target_os = "macos")]
+fn get_cursor_position() -> Option<(f64, f64)> {
+    use core_graphics::event::CGEvent;
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
+    let event = CGEvent::new(source).ok()?;
+    let point = event.location();
+    Some((point.x, point.y))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn get_cursor_position() -> Option<(f64, f64)> {
+    // TODO: Implement for Windows/Linux
+    None
+}
+
+/// Extract monitor info from the primary monitor (fallback).
+fn get_primary_monitor_info(app: &AppHandle) -> Option<MonitorInfo> {
     match app.primary_monitor() {
         Ok(Some(monitor)) => {
             let size = monitor.size();
