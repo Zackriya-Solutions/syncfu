@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["src-tauri", "cli"]
+members = ["core", "cli", "desktop"]
 
 [profile.release]
 lto = true

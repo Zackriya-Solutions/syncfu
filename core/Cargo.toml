@@ -1,0 +1,25 @@
+[package]
+name = "syncfu-core"
+version = "0.2.0"
+edition = "2021"
+description = "Core library for syncfu — notification manager, HTTP server, and types"
+license = "MIT"
+
+[dependencies]
+axum = { version = "0.8", features = ["default"] }
+async-stream = "0.3"
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+indexmap = { version = "2", features = ["serde"] }
+log = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros", "test-util"] }
+tower = { version = "0.5", features = ["util"] }

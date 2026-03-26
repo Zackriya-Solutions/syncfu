@@ -4,7 +4,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use tokio::sync::RwLock;
 
-use super::types::{NotificationPayload, NotificationUpdate};
+use crate::types::{NotificationPayload, NotificationUpdate};
 
 const MAX_VISIBLE: usize = 5;
 
@@ -109,7 +109,7 @@ impl NotificationManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::notification::types::{Priority, Timeout};
+    use crate::types::{Priority, Timeout};
 
     fn make_notification(id: &str) -> NotificationPayload {
         NotificationPayload {

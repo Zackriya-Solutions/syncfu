@@ -56,7 +56,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbb4e440d04be07da1f1bf44fb4495ebd58669372fe0cffa6e48595ac5bd88a3"
 dependencies = [
  "android_log-sys",
- "env_filter",
+ "env_filter 0.1.4",
  "log",
 ]
 
@@ -1267,6 +1267,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32e90c2accc4b07a8456ea0debdc2e7587bdd890680d71173a15d4ae604f6eef"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.11.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0621c04f2196ac3f488dd583365b9c09be011a4ab8b9f37248ffcc8f6198b56a"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter 1.0.1",
+ "jiff",
+ "log",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2327,6 +2350,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "jiff"
+version = "0.2.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a3546dc96b6d42c5f24902af9e2538e82e39ad350b0c766eb3fbf2d8f3d8359"
+dependencies = [
+ "jiff-static",
+ "log",
+ "portable-atomic",
+ "portable-atomic-util",
+ "serde_core",
+]
+
+[[package]]
+name = "jiff-static"
+version = "0.2.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a8c8b344124222efd714b73bb41f8b5120b27a7cc1c75593a6ff768d9d05aa4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "jni"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3361,6 +3408,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "portable-atomic"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c33a9471896f1c69cecef8d20cbe2f7accd12527ce60845ff44c153bb2a21b49"
+
+[[package]]
+name = "portable-atomic-util"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "091397be61a01d4be58e7841595bd4bfedb15f1cd54977d79b8271e94ed799a3"
+dependencies = [
+ "portable-atomic",
+]
+
+[[package]]
 name = "potential_utf"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3555,7 +3617,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4604,17 +4666,13 @@ dependencies = [
 name = "syncfu"
 version = "0.2.0"
 dependencies = [
- "anyhow",
- "async-stream",
- "axum",
  "chrono",
  "core-graphics 0.24.0",
- "futures",
- "indexmap 2.13.0",
  "log",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "syncfu-core",
  "tauri",
  "tauri-build",
  "tauri-nspanel",
@@ -4625,7 +4683,6 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tower",
- "tower-http",
  "uuid",
 ]
 
@@ -4635,12 +4692,34 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
+ "env_logger",
  "futures",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "syncfu-core",
+ "tokio",
+ "wiremock",
+]
+
+[[package]]
+name = "syncfu-core"
+version = "0.2.0"
+dependencies = [
+ "async-stream",
+ "axum",
+ "chrono",
+ "futures",
+ "indexmap 2.13.0",
+ "log",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tokio",
- "wiremock",
+ "tower",
+ "tower-http",
+ "uuid",
 ]
 
 [[package]]

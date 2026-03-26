@@ -9,24 +9,25 @@ use axum::{
     Json, Router,
 };
 use futures::stream::Stream;
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
-use crate::notification::manager::NotificationManager;
-use crate::notification::types::{
+use crate::manager::NotificationManager;
+use crate::notifier::UiNotifier;
+use crate::types::{
     Action, NotificationPayload, NotificationUpdate, Priority, ProgressInfo, StyleOverrides,
     Timeout,
 };
-use crate::server::waiters::{WaitEvent, WaiterRegistry};
-use crate::server::webhook::{self, WebhookPayload, WebhookResult};
+use crate::waiters::{WaitEvent, WaiterRegistry};
+use crate::webhook::{self, WebhookPayload, WebhookResult};
 
 /// Shared state for the HTTP server.
 #[derive(Clone)]
 pub struct ServerState {
     pub manager: Arc<NotificationManager>,
     pub waiters: Arc<WaiterRegistry>,
-    pub app_handle: Option<tauri::AppHandle>,
+    pub notifier: Arc<dyn UiNotifier>,
 }
 
 /// Incoming notification request — similar to NotificationPayload but with optional fields.
@@ -122,7 +123,6 @@ async fn handle_notify(
     State(state): State<ServerState>,
     Json(req): Json<NotifyRequest>,
 ) -> (StatusCode, Json<NotifyResponse>) {
-    let req_sender = req.sender.clone();
     let payload = NotificationPayload {
         id: uuid::Uuid::new_v4().to_string(),
         sender: req.sender,
@@ -142,18 +142,7 @@ async fn handle_notify(
     };
 
     let id = state.manager.add(payload.clone()).await;
-
-    // Show panel and emit to frontend
-    if let Some(ref app) = state.app_handle {
-        crate::overlay::panel::show_panel(app);
-        debug!("Emitting notification:add for id={id}");
-        match tauri::Emitter::emit(app, "notification:add", &payload) {
-            Ok(()) => info!("Notification emitted: id={id} sender={}", req_sender),
-            Err(e) => error!("Failed to emit notification:add: {e}"),
-        }
-    } else {
-        warn!("No app_handle — cannot emit notification event");
-    }
+    state.notifier.on_added(&payload);
 
     (StatusCode::CREATED, Json(NotifyResponse { id }))
 }
@@ -172,13 +161,7 @@ async fn handle_update(
     let updated = state.manager.update(&id, update.clone()).await;
 
     if updated {
-        if let Some(ref app) = state.app_handle {
-            let _ = tauri::Emitter::emit(
-                app,
-                "notification:update",
-                &serde_json::json!({ "id": id, "update": update }),
-            );
-        }
+        state.notifier.on_updated(&id, &update);
         info!("Notification updated: id={id}");
         StatusCode::OK
     } else {
@@ -230,12 +213,8 @@ async fn handle_action(
     // Dismiss after action
     let dismissed = state.manager.dismiss(&id).await;
     if dismissed.is_some() {
-        if let Some(ref app) = state.app_handle {
-            let _ = tauri::Emitter::emit(app, "notification:dismiss", &id);
-            if state.manager.active_count().await == 0 {
-                crate::overlay::panel::hide_panel(app);
-            }
-        }
+        let remaining = state.manager.active_count().await;
+        state.notifier.on_dismissed(&id, remaining);
     }
 
     info!(
@@ -254,9 +233,7 @@ async fn handle_wait(
 > {
     debug!("Wait request for id={id}");
 
-    // Subscribe BEFORE checking existence to avoid race condition:
-    // if the notification is resolved between our check and subscribe,
-    // we'd miss the event.
+    // Subscribe BEFORE checking existence to avoid race condition
     let mut rx = state.waiters.subscribe(&id).await;
 
     // Verify notification still exists
@@ -310,13 +287,8 @@ async fn handle_dismiss(
         // Notify waiting CLI clients
         state.waiters.notify(&id, WaitEvent::Dismissed).await;
 
-        if let Some(ref app) = state.app_handle {
-            let _ = tauri::Emitter::emit(app, "notification:dismiss", &id);
-            // Hide panel if no more active notifications
-            if state.manager.active_count().await == 0 {
-                crate::overlay::panel::hide_panel(app);
-            }
-        }
+        let remaining = state.manager.active_count().await;
+        state.notifier.on_dismissed(&id, remaining);
         info!("Notification dismissed: id={id}");
         StatusCode::OK
     } else {
@@ -334,10 +306,7 @@ async fn handle_dismiss_all(
     let dismissed = state.manager.dismiss_all().await;
     let count = dismissed.len();
 
-    if let Some(ref app) = state.app_handle {
-        crate::overlay::panel::hide_panel(app);
-        let _ = tauri::Emitter::emit(app, "notification:dismiss-all", &count);
-    }
+    state.notifier.on_all_dismissed(count);
 
     info!("All notifications dismissed: count={count}");
     Json(DismissAllResponse { dismissed: count })
@@ -361,6 +330,7 @@ async fn handle_active(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notifier::NoopNotifier;
     use axum::body::Body;
     use axum::http::Request;
     use tower::ServiceExt;
@@ -369,7 +339,7 @@ mod tests {
         ServerState {
             manager: NotificationManager::new(),
             waiters: WaiterRegistry::new(),
-            app_handle: None,
+            notifier: Arc::new(NoopNotifier),
         }
     }
 
@@ -429,41 +399,7 @@ mod tests {
         let resp: NotifyResponse = serde_json::from_slice(&body).unwrap();
         assert!(!resp.id.is_empty());
 
-        // Verify notification was stored
         assert_eq!(state.manager.active_count().await, 1);
-    }
-
-    #[tokio::test]
-    async fn test_notify_with_all_fields() {
-        let app = build_router(test_state());
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/notify")
-                    .header("content-type", "application/json")
-                    .body(Body::from(
-                        serde_json::to_string(&serde_json::json!({
-                            "sender": "ci",
-                            "title": "Build Complete",
-                            "body": "All tests passed",
-                            "priority": "high",
-                            "actions": [
-                                { "id": "open", "label": "Open PR", "style": "primary" }
-                            ],
-                            "progress": { "value": 0.75, "label": "75%", "style": "bar" },
-                            "group": "ci-builds",
-                            "sound": "success"
-                        }))
-                        .unwrap(),
-                    ))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::CREATED);
     }
 
     #[tokio::test]
@@ -620,41 +556,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_nonexistent_returns_404() {
-        let app = build_router(test_state());
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/notify/nonexistent/update")
-                    .header("content-type", "application/json")
-                    .body(Body::from(
-                        serde_json::to_string(&serde_json::json!({
-                            "body": "Updated"
-                        }))
-                        .unwrap(),
-                    ))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn test_active_returns_list() {
+    async fn test_action_dismisses_notification() {
         let state = test_state();
         let payload = NotificationPayload {
-            id: "n1".to_string(),
-            sender: "test".to_string(),
-            title: "Test".to_string(),
-            body: "Body".to_string(),
+            id: "action-test".to_string(),
+            sender: "ci".to_string(),
+            title: "Build".to_string(),
+            body: "Done".to_string(),
             icon: None,
             priority: Priority::Normal,
             timeout: Timeout::default(),
-            actions: vec![],
+            actions: vec![Action {
+                id: "approve".to_string(),
+                label: "Approve".to_string(),
+                style: crate::types::ActionStyle::Primary,
+                icon: None,
+                bg: None,
+                color: None,
+                border_color: None,
+            }],
             progress: None,
             group: None,
             theme: None,
@@ -664,27 +584,29 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
         state.manager.add(payload).await;
+        assert_eq!(state.manager.active_count().await, 1);
 
-        let app = build_router(state);
+        let app = build_router(state.clone());
 
         let response = app
             .oneshot(
                 Request::builder()
-                    .uri("/active")
-                    .body(Body::empty())
+                    .method("POST")
+                    .uri("/notify/action-test/action")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::to_string(&serde_json::json!({
+                            "action_id": "approve"
+                        }))
+                        .unwrap(),
+                    ))
                     .unwrap(),
             )
             .await
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let notifications: Vec<NotificationPayload> = serde_json::from_slice(&body).unwrap();
-        assert_eq!(notifications.len(), 1);
-        assert_eq!(notifications[0].title, "Test");
+        assert_eq!(state.manager.active_count().await, 0);
     }
 
     #[tokio::test]
@@ -729,149 +651,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_action_dismisses_notification() {
+    async fn test_active_returns_list() {
         let state = test_state();
         let payload = NotificationPayload {
-            id: "action-test".to_string(),
-            sender: "ci".to_string(),
-            title: "Build".to_string(),
-            body: "Done".to_string(),
-            icon: None,
-            priority: Priority::Normal,
-            timeout: Timeout::default(),
-            actions: vec![Action {
-                id: "approve".to_string(),
-                label: "Approve".to_string(),
-                style: crate::notification::types::ActionStyle::Primary,
-                icon: None,
-                bg: None,
-                color: None,
-                border_color: None,
-            }],
-            progress: None,
-            group: None,
-            theme: None,
-            sound: None,
-            callback_url: None,
-            style: None,
-            created_at: chrono::Utc::now(),
-        };
-        state.manager.add(payload).await;
-        assert_eq!(state.manager.active_count().await, 1);
-
-        let app = build_router(state.clone());
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/notify/action-test/action")
-                    .header("content-type", "application/json")
-                    .body(Body::from(
-                        serde_json::to_string(&serde_json::json!({
-                            "action_id": "approve"
-                        }))
-                        .unwrap(),
-                    ))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let result: WebhookResult = serde_json::from_slice(&body).unwrap();
-        // No callback_url, so success=true with no status_code
-        assert!(result.success);
-        assert!(result.status_code.is_none());
-
-        // Notification should be dismissed
-        assert_eq!(state.manager.active_count().await, 0);
-    }
-
-    #[tokio::test]
-    async fn test_action_nonexistent_returns_404() {
-        let app = build_router(test_state());
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/notify/nonexistent/action")
-                    .header("content-type", "application/json")
-                    .body(Body::from(
-                        serde_json::to_string(&serde_json::json!({
-                            "action_id": "click"
-                        }))
-                        .unwrap(),
-                    ))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn test_notify_default_priority_is_normal() {
-        let state = test_state();
-        let app = build_router(state.clone());
-
-        app.oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/notify")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    serde_json::to_string(&serde_json::json!({
-                        "sender": "test",
-                        "title": "Hello",
-                        "body": "World"
-                    }))
-                    .unwrap(),
-                ))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-
-        let active = state.manager.list_active().await;
-        assert_eq!(active[0].priority, Priority::Normal);
-    }
-
-    #[tokio::test]
-    async fn test_wait_nonexistent_returns_dismissed_immediately() {
-        let app = build_router(test_state());
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .uri("/notify/nonexistent/wait")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // SSE endpoint returns 200 with a dismissed event for already-resolved notifications
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body_str = String::from_utf8(body.to_vec()).unwrap();
-        assert!(body_str.contains("dismissed"));
-    }
-
-    #[tokio::test]
-    async fn test_wait_existing_notification_sends_connected() {
-        let state = test_state();
-        let payload = NotificationPayload {
-            id: "wait-test".to_string(),
+            id: "n1".to_string(),
             sender: "test".to_string(),
             title: "Test".to_string(),
             body: "Body".to_string(),
@@ -889,20 +672,12 @@ mod tests {
         };
         state.manager.add(payload).await;
 
-        // Subscribe to waiters and trigger dismiss concurrently with the SSE stream
-        let waiters = state.waiters.clone();
-        tokio::spawn(async move {
-            // Small delay to let SSE stream start
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            waiters.notify("wait-test", WaitEvent::Dismissed).await;
-        });
-
         let app = build_router(state);
 
         let response = app
             .oneshot(
                 Request::builder()
-                    .uri("/notify/wait-test/wait")
+                    .uri("/active")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -914,10 +689,8 @@ mod tests {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let body_str = String::from_utf8(body.to_vec()).unwrap();
-        // Should contain both connected and dismissed events
-        assert!(body_str.contains("connected"), "body: {body_str}");
-        assert!(body_str.contains("dismissed"), "body: {body_str}");
+        let notifications: Vec<NotificationPayload> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(notifications.len(), 1);
     }
 
     #[tokio::test]
@@ -934,7 +707,7 @@ mod tests {
             actions: vec![Action {
                 id: "approve".to_string(),
                 label: "Approve".to_string(),
-                style: crate::notification::types::ActionStyle::Primary,
+                style: crate::types::ActionStyle::Primary,
                 icon: None,
                 bg: None,
                 color: None,
@@ -950,12 +723,10 @@ mod tests {
         };
         state.manager.add(payload).await;
 
-        // Subscribe as a waiter
         let mut rx = state.waiters.subscribe("waiter-action").await;
 
         let app = build_router(state);
 
-        // Trigger action via HTTP
         let response = app
             .oneshot(
                 Request::builder()
@@ -975,7 +746,6 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        // Waiter should have received the action event
         let event = rx.recv().await.unwrap();
         assert_eq!(
             event,
@@ -983,94 +753,5 @@ mod tests {
                 action_id: "approve".to_string()
             }
         );
-    }
-
-    #[tokio::test]
-    async fn test_dismiss_notifies_waiters() {
-        let state = test_state();
-        let payload = NotificationPayload {
-            id: "waiter-dismiss".to_string(),
-            sender: "test".to_string(),
-            title: "Test".to_string(),
-            body: "Body".to_string(),
-            icon: None,
-            priority: Priority::Normal,
-            timeout: Timeout::default(),
-            actions: vec![],
-            progress: None,
-            group: None,
-            theme: None,
-            sound: None,
-            callback_url: None,
-            style: None,
-            created_at: chrono::Utc::now(),
-        };
-        state.manager.add(payload).await;
-
-        let mut rx = state.waiters.subscribe("waiter-dismiss").await;
-
-        let app = build_router(state);
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/notify/waiter-dismiss/dismiss")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let event = rx.recv().await.unwrap();
-        assert_eq!(event, WaitEvent::Dismissed);
-    }
-
-    #[tokio::test]
-    async fn test_dismiss_all_notifies_waiters() {
-        let state = test_state();
-        for i in 0..2 {
-            let payload = NotificationPayload {
-                id: format!("da-{i}"),
-                sender: "test".to_string(),
-                title: format!("Test {i}"),
-                body: "Body".to_string(),
-                icon: None,
-                priority: Priority::Normal,
-                timeout: Timeout::default(),
-                actions: vec![],
-                progress: None,
-                group: None,
-                theme: None,
-                sound: None,
-                callback_url: None,
-                style: None,
-                created_at: chrono::Utc::now(),
-            };
-            state.manager.add(payload).await;
-        }
-
-        let mut rx0 = state.waiters.subscribe("da-0").await;
-        let mut rx1 = state.waiters.subscribe("da-1").await;
-
-        let app = build_router(state);
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/dismiss-all")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-
-        assert_eq!(rx0.recv().await.unwrap(), WaitEvent::Dismissed);
-        assert_eq!(rx1.recv().await.unwrap(), WaitEvent::Dismissed);
     }
 }

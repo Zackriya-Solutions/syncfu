@@ -1,4 +1,5 @@
 mod client;
+mod daemon;
 mod output;
 mod types;
 mod wait;
@@ -10,6 +11,7 @@ use client::SyncfuClient;
 use types::*;
 
 const DEFAULT_SERVER: &str = "http://127.0.0.1:9868";
+const DEFAULT_PORT: u16 = 9868;
 
 #[derive(Parser)]
 #[command(name = "syncfu", about = "CLI for syncfu — send notifications from anywhere")]
@@ -147,6 +149,13 @@ enum Commands {
 
     /// Check server health (JSON)
     Health,
+
+    /// Run the headless notification server (no GUI)
+    Serve {
+        /// Port to listen on
+        #[arg(short, long, default_value_t = DEFAULT_PORT)]
+        port: u16,
+    },
 }
 
 fn default_sender() -> String {
@@ -158,7 +167,26 @@ fn default_sender() -> String {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let cli = Cli::parse();
+
+    // `serve` runs the embedded server — no client needed
+    if let Commands::Serve { port } = &cli.command {
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+            .init();
+        if let Err(e) = daemon::run_headless_server(*port).await {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let client = SyncfuClient::new(&cli.server);
+
+    // Auto-launch: if server is down, try to start it
+    if client.health().await.is_err() {
+        if daemon::try_auto_launch(&cli.server).await {
+            eprintln!("syncfu server started automatically");
+        }
+    }
 
     let result = run(cli, &client).await;
     if let Err(e) = result {
@@ -283,6 +311,8 @@ async fn run(cli: Cli, client: &SyncfuClient) -> Result<()> {
             let resp = client.health().await?;
             output::print_health(&resp);
         }
+
+        Commands::Serve { .. } => unreachable!(),
     }
     Ok(())
 }
