@@ -1,6 +1,10 @@
-# syncfu
+<p align="center">
+  <img src="assets/app-icon.png" width="128" height="128" alt="syncfu icon" />
+</p>
 
-**The notification layer your AI agents are missing.**
+<h1 align="center">syncfu</h1>
+
+<p align="center"><strong>The notification layer your AI agents are missing.</strong></p>
 
 syncfu is a standalone overlay notification system that sits between your background processes — AI agents, autonomous loops, skills, CI pipelines, cron jobs, anything — and you. It renders always-on-top native notifications that bypass the OS notification center, so nothing gets buried.
 
