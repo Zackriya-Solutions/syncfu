@@ -1,12 +1,13 @@
 #Requires -Version 5.1
 param(
-    [string]$Version = ""
+    [string]$Version = "",
+    [switch]$CliOnly
 )
 
 $ErrorActionPreference = 'Stop'
 
 $Repo = "Zackriya-Solutions/syncfu"
-$Artifact = "syncfu-windows-x86_64.exe"
+$CliArtifact = "syncfu-windows-x86_64.exe"
 $BinaryName = "syncfu.exe"
 
 # --- Resolve version ---
@@ -44,15 +45,16 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     exit 1
 }
 
-# --- Install directory ---
+# --- Install directories ---
 if ($env:SYNCFU_INSTALL_DIR) {
-    $InstallDir = $env:SYNCFU_INSTALL_DIR
+    $CliDir = $env:SYNCFU_INSTALL_DIR
 } else {
-    $InstallDir = Join-Path $HOME ".syncfu\bin"
+    $CliDir = Join-Path $HOME ".syncfu\bin"
 }
 
-$Url = "https://github.com/$Repo/releases/download/v$Version/$Artifact"
-$ChecksumUrl = "https://github.com/$Repo/releases/download/v$Version/checksums.txt"
+$BaseUrl = "https://github.com/$Repo/releases/download/v$Version"
+# Tauri NSIS installer artifact name
+$DesktopArtifact = "syncfu_${Version}_x64-setup.exe"
 
 Write-Host ""
 Write-Host "  syncfu installer" -ForegroundColor White
@@ -61,72 +63,134 @@ Write-Host "  Version:  " -ForegroundColor Cyan -NoNewline
 Write-Host "v$Version"
 Write-Host "  Platform: " -ForegroundColor Cyan -NoNewline
 Write-Host "windows/x86_64"
-Write-Host "  Install:  " -ForegroundColor Cyan -NoNewline
-Write-Host "$InstallDir"
+if (-not $CliOnly) {
+    Write-Host "  Desktop:  " -ForegroundColor Cyan -NoNewline
+    Write-Host "yes (tray + overlay notifications)"
+}
+Write-Host "  CLI:      " -ForegroundColor Cyan -NoNewline
+Write-Host "$CliDir\$BinaryName"
 Write-Host ""
 
-# --- Download ---
 $TmpDir = Join-Path $env:TEMP "syncfu-install-$([System.IO.Path]::GetRandomFileName())"
 New-Item -ItemType Directory -Force -Path $TmpDir | Out-Null
-$TmpFile = Join-Path $TmpDir $BinaryName
 
 try {
-    Write-Host "info  " -ForegroundColor Green -NoNewline
-    Write-Host "Downloading syncfu v$Version..."
+    # =============================================
+    # 1. Install desktop app (unless -CliOnly)
+    # =============================================
+    if (-not $CliOnly) {
+        Write-Host "info  " -ForegroundColor Green -NoNewline
+        Write-Host "Downloading syncfu desktop installer..."
 
-    Invoke-WebRequest -Uri $Url -OutFile $TmpFile -UseBasicParsing
+        $InstallerPath = Join-Path $TmpDir $DesktopArtifact
+        try {
+            Invoke-WebRequest -Uri "$BaseUrl/$DesktopArtifact" -OutFile $InstallerPath -UseBasicParsing
+            Write-Host "info  " -ForegroundColor Green -NoNewline
+            Write-Host "Running desktop installer (silent)..."
+
+            # NSIS silent install
+            Start-Process -FilePath $InstallerPath -ArgumentList "/S" -Wait -NoNewWindow
+            Write-Host "info  " -ForegroundColor Green -NoNewline
+            Write-Host "Desktop app installed"
+        } catch {
+            Write-Host "warn  " -ForegroundColor Yellow -NoNewline
+            Write-Host "Desktop app download failed. Installing CLI only."
+            $CliOnly = $true
+        }
+    }
+
+    # =============================================
+    # 2. Install CLI binary
+    # =============================================
+    Write-Host "info  " -ForegroundColor Green -NoNewline
+    Write-Host "Downloading syncfu CLI..."
+
+    $CliPath = Join-Path $TmpDir $BinaryName
+    Invoke-WebRequest -Uri "$BaseUrl/$CliArtifact" -OutFile $CliPath -UseBasicParsing
 
     # --- Verify checksum ---
     Write-Host "info  " -ForegroundColor Green -NoNewline
     Write-Host "Verifying checksum..."
 
-    try {
-        $ChecksumFile = Join-Path $TmpDir "checksums.txt"
-        Invoke-WebRequest -Uri $ChecksumUrl -OutFile $ChecksumFile -UseBasicParsing
+    $ChecksumFile = Join-Path $TmpDir "checksums.txt"
+    Invoke-WebRequest -Uri "$BaseUrl/checksums.txt" -OutFile $ChecksumFile -UseBasicParsing
 
-        $EscapedArtifact = [regex]::Escape($Artifact)
-        $Lines = @(Get-Content $ChecksumFile | Where-Object { $_ -match "^\S+\s+$EscapedArtifact$" })
-        if ($Lines.Count -ne 1) {
-            Write-Host "error " -ForegroundColor Red -NoNewline
-            Write-Host "Expected exactly 1 checksum entry for $Artifact, found $($Lines.Count)"
-            exit 1
-        }
-        $Expected = ($Lines[0] -replace '\s+.*', '').ToLower()
-        $Actual = (Get-FileHash -Path $TmpFile -Algorithm SHA256).Hash.ToLower()
-
-        if ($Expected -ne $Actual) {
-            Write-Host "error " -ForegroundColor Red -NoNewline
-            Write-Host "Checksum mismatch! Expected: $Expected, Got: $Actual"
-            exit 1
-        }
-        Write-Host "info  " -ForegroundColor Green -NoNewline
-        Write-Host "Checksum verified"
-    } catch {
+    $EscapedArtifact = [regex]::Escape($CliArtifact)
+    $Lines = @(Get-Content $ChecksumFile | Where-Object { $_ -match "^\S+\s+$EscapedArtifact$" })
+    if ($Lines.Count -ne 1) {
         Write-Host "error " -ForegroundColor Red -NoNewline
-        Write-Host "Checksum verification failed: $_"
+        Write-Host "Expected exactly 1 checksum entry for $CliArtifact, found $($Lines.Count)"
         exit 1
     }
+    $Expected = ($Lines[0] -replace '\s+.*', '').ToLower()
+    $Actual = (Get-FileHash -Path $CliPath -Algorithm SHA256).Hash.ToLower()
 
-    # --- Install ---
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Move-Item -Force $TmpFile (Join-Path $InstallDir $BinaryName)
+    if ($Expected -ne $Actual) {
+        Write-Host "error " -ForegroundColor Red -NoNewline
+        Write-Host "Checksum mismatch! Expected: $Expected, Got: $Actual"
+        exit 1
+    }
+    Write-Host "info  " -ForegroundColor Green -NoNewline
+    Write-Host "Checksum verified"
+
+    # --- Install CLI ---
+    New-Item -ItemType Directory -Force -Path $CliDir | Out-Null
+    Move-Item -Force $CliPath (Join-Path $CliDir $BinaryName)
 
     Write-Host "info  " -ForegroundColor Green -NoNewline
-    Write-Host "Installed to $InstallDir\$BinaryName"
+    Write-Host "CLI installed to $CliDir\$BinaryName"
 
     # --- Add to PATH ---
     $UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $PathEntries = $UserPath -split ';'
-    if ($InstallDir -notin $PathEntries) {
-        [Environment]::SetEnvironmentVariable('Path', "$InstallDir;$UserPath", 'User')
-        $env:Path = "$InstallDir;$env:Path"
+    if ($CliDir -notin $PathEntries) {
+        [Environment]::SetEnvironmentVariable('Path', "$CliDir;$UserPath", 'User')
+        $env:Path = "$CliDir;$env:Path"
         Write-Host ""
         Write-Host "info  " -ForegroundColor Green -NoNewline
-        Write-Host "Added $InstallDir to your PATH."
+        Write-Host "Added $CliDir to your PATH."
         Write-Host "      Restart your terminal for PATH changes to take effect."
     }
 
+    # =============================================
+    # 3. Start desktop app
+    # =============================================
+    if (-not $CliOnly) {
+        $SyncfuExe = Join-Path $env:LOCALAPPDATA "syncfu\syncfu.exe"
+        if (Test-Path $SyncfuExe) {
+            Write-Host ""
+            Write-Host "info  " -ForegroundColor Green -NoNewline
+            Write-Host "Starting syncfu (tray + overlay)..."
+            Start-Process -FilePath $SyncfuExe -WindowStyle Hidden
+
+            Start-Sleep -Seconds 3
+            try {
+                $null = Invoke-WebRequest -Uri "http://127.0.0.1:9868/health" -UseBasicParsing -TimeoutSec 2
+                Write-Host "info  " -ForegroundColor Green -NoNewline
+                Write-Host "syncfu is running - server listening on port 9868"
+            } catch {
+                Write-Host "warn  " -ForegroundColor Yellow -NoNewline
+                Write-Host "syncfu started but server not yet responding. It may take a moment."
+            }
+        }
+    }
+
     # --- Done ---
+    Write-Host ""
+    if (-not $CliOnly) {
+        Write-Host "  syncfu is installed and running!" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  Quick test:" -ForegroundColor Cyan
+        Write-Host '    syncfu send "Hello from syncfu!"'
+    } else {
+        Write-Host "  syncfu CLI installed (headless mode)." -ForegroundColor White
+        Write-Host ""
+        Write-Host "  Start the server:" -ForegroundColor Cyan
+        Write-Host "    syncfu serve"
+        Write-Host ""
+        Write-Host "  Send a notification:" -ForegroundColor Cyan
+        Write-Host '    syncfu send "Hello from syncfu!"'
+    }
     Write-Host ""
     Write-Host "info  " -ForegroundColor Green -NoNewline
     Write-Host "Done! Run 'syncfu --help' to get started."
@@ -134,7 +198,7 @@ try {
 
 } catch {
     Write-Host "error " -ForegroundColor Red -NoNewline
-    Write-Host "Download failed. Check: https://github.com/$Repo/releases/tag/v$Version"
+    Write-Host "Installation failed: $_"
     exit 1
 } finally {
     Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
