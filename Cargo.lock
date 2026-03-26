@@ -4602,7 +4602,7 @@ dependencies = [
 
 [[package]]
 name = "syncfu"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -4631,7 +4631,7 @@ dependencies = [
 
 [[package]]
 name = "syncfu-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
