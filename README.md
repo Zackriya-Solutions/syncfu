@@ -78,6 +78,7 @@ Built with **Tauri v2** + **Rust** (axum) + **React** (Zustand). Ships on macOS,
 - [How it works](#how-it-works)
 - [Install](#install)
 - [Quick start](#quick-start)
+- [Claude Code integration](#claude-code-integration)
 - [Use cases](#use-cases)
 - [System tray](#system-tray)
 - [API reference](#api-reference)
@@ -215,6 +216,35 @@ syncfu is designed to stay alive in the background — your agents depend on it.
 - **Ctrl+Q / Cmd+Q** asks: *"Quit syncfu? Agents won't be able to notify you."*
 - **Tray → Quit** also confirms before exiting
 - You'll never accidentally kill it
+
+---
+
+## Claude Code integration
+
+syncfu ships with ready-to-use [Claude Code](https://claude.ai/claude-code) files in the [`claude/`](claude/) directory:
+
+| File | What it does | How to use |
+|------|-------------|------------|
+| [`claude/command.md`](claude/command.md) | `/syncfu` slash command — type `/syncfu tests passed` and Claude sends the notification for you | Copy to `~/.claude/commands/syncfu.md` |
+| [`claude/skill.md`](claude/skill.md) | Full API reference — Claude reads this to know all flags, endpoints, and patterns | Copy to `~/.claude/skills/syncfu.md` |
+
+**Quick setup:**
+```bash
+# Install the slash command and skill
+cp claude/command.md ~/.claude/commands/syncfu.md
+cp claude/skill.md ~/.claude/skills/syncfu.md
+```
+
+Then in Claude Code:
+```
+/syncfu build passed, all 142 tests green
+/syncfu critical: database connection pool exhausted
+/syncfu ask me whether to deploy
+```
+
+Claude interprets your intent, picks the right priority/icon/actions, and runs the CLI command. With `ask me` phrasing, it uses `--wait` to block until you respond via the overlay notification.
+
+See [`claude/command.md`](claude/command.md) for the full pattern reference.
 
 ---
 
