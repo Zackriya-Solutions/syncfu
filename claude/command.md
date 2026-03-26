@@ -79,14 +79,26 @@ syncfu send <BODY>
   -s, --sender <SENDER>     Sender name (default: $USER)
   -p, --priority <PRI>      low | normal | high | critical
   -i, --icon <ICON>         Lucide icon name
-  -a, --action <SPEC>       "id:label:style" (repeatable)
+  -a, --action <SPEC>       "id:label:style" (repeatable, max 3)
   --progress <0.0-1.0>      Progress bar value
   --progress-label <TEXT>    Progress label
+  --progress-style <STYLE>  bar (default) | ring
   --timeout <TIMEOUT>       "never" | "default" | seconds
-  -w, --wait                Block until action/dismiss/timeout
-  --wait-timeout <SECS>     Max wait time (default: 300)
-  --callback-url <URL>      Webhook for action callbacks
-  --style-json <JSON>       Style overrides
+  --group <GROUP>            Group/category key
+  --theme <THEME>            light | dark (auto-follows system)
+  --sound <SOUND>            Sound name
+  --font <FONT>              Google Font name
+  --callback-url <URL>       Webhook for action callbacks
+  --style-json <JSON>        Style overrides (27 properties)
+  -w, --wait                 Block until action/dismiss/timeout
+  --wait-timeout <SECS>      Max wait time (default: 300)
+  --json                     Force JSON output
+  --server <URL>             Server URL (default: http://127.0.0.1:9868)
+
+syncfu update <ID>          Update existing notification
+  --body <TEXT>              New body text
+  --progress <0.0-1.0>      New progress value
+  --progress-label <TEXT>    New progress label
 
 syncfu list                 List active (JSON)
 syncfu health               Server health
