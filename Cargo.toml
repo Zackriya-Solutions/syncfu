@@ -6,3 +6,4 @@ members = ["src-tauri", "cli"]
 lto = true
 strip = true
 codegen-units = 1
+panic = "abort"

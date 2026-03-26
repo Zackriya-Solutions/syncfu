@@ -628,7 +628,7 @@ syncfu send -t "Fancy" --font "Space Grotesk" "With a custom font"
 syncfu is open source under the MIT license. Contributions welcome.
 
 ```bash
-git clone https://github.com/nicosujith/syncfu.git
+git clone https://github.com/Zackriya-Solutions/syncfu.git
 cd syncfu
 pnpm install
 cargo tauri dev
