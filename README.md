@@ -64,18 +64,33 @@ CLI (--wait) ─────────▸ SSE stream ◂──── wait for 
 
 ## Install
 
-### From source (recommended)
+### One-liner (recommended)
+
 ```bash
-git clone https://github.com/nicosujith/syncfu.git
+curl -fsSL https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/install.sh | sh
+```
+
+Windows (PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/install.ps1 | iex
+```
+
+Install a specific version:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/install.sh | sh -s -- --version=0.2.0
+```
+
+### From source
+```bash
+cargo install --path cli
+```
+
+### Desktop app (from source)
+```bash
+git clone https://github.com/Zackriya-Solutions/syncfu.git
 cd syncfu
 pnpm install
 cargo tauri build
-```
-
-### CLI only
-```bash
-cd cli
-cargo install --path .
 ```
 
 ---
