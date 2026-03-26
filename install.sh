@@ -3,6 +3,7 @@ set -eu
 
 REPO="Zackriya-Solutions/syncfu"
 BINARY_NAME="syncfu"
+SKIP_CHECKSUM=0
 
 # --- Colors (only if terminal) ---
 if [ -t 1 ]; then
@@ -20,13 +21,15 @@ VERSION=""
 for arg in "$@"; do
   case "$arg" in
     --version=*) VERSION="${arg#--version=}" ;;
+    --skip-checksum) SKIP_CHECKSUM=1 ;;
     --help|-h)
-      printf "Usage: install.sh [--version=X.Y.Z]\n"
+      printf "Usage: install.sh [--version=X.Y.Z] [--skip-checksum]\n"
       printf "\nInstalls the syncfu CLI from GitHub Releases.\n"
       printf "\nOptions:\n"
       printf "  --version=X.Y.Z  Install a specific version (default: latest)\n"
+      printf "  --skip-checksum  Skip SHA-256 integrity verification\n"
       printf "\nEnvironment:\n"
-      printf "  SYNCFU_INSTALL_DIR  Override install directory\n"
+      printf "  SYNCFU_INSTALL_DIR  Override install directory (must be absolute path)\n"
       exit 0
       ;;
   esac
@@ -58,21 +61,27 @@ command -v curl >/dev/null 2>&1 || error "curl is required but not installed. In
 # --- Resolve version ---
 if [ -z "$VERSION" ]; then
   info "Resolving latest version..."
-  VERSION=$(curl -sI "https://github.com/${REPO}/releases/latest" 2>/dev/null | \
-    grep -i '^location:' | sed 's|.*/v||' | tr -d '\r')
-  if [ -z "$VERSION" ]; then
+  LOCATION_HEADER=$(curl -sI "https://github.com/${REPO}/releases/latest" 2>/dev/null | grep -i '^location:' || true)
+  if [ -z "$LOCATION_HEADER" ]; then
     error "Could not determine latest version. Try: --version=0.2.0"
+  fi
+  VERSION=$(printf '%s' "$LOCATION_HEADER" | sed 's|.*/v||' | tr -d '\r')
+  if [ -z "$VERSION" ]; then
+    error "Could not parse version from redirect. Try: --version=0.2.0"
   fi
 fi
 
-# --- Validate version format ---
-case "$VERSION" in
-  [0-9]*.[0-9]*.[0-9]*) ;;
-  *) error "Unexpected version format: $VERSION" ;;
-esac
+# --- Validate version format (digits and dots only) ---
+if ! expr "$VERSION" : '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' > /dev/null 2>&1; then
+  error "Unexpected version format: $VERSION"
+fi
 
 # --- Install directory ---
 if [ -n "${SYNCFU_INSTALL_DIR:-}" ]; then
+  case "$SYNCFU_INSTALL_DIR" in
+    /*) ;;
+    *) error "SYNCFU_INSTALL_DIR must be an absolute path" ;;
+  esac
   INSTALL_DIR="$SYNCFU_INSTALL_DIR"
 elif [ -w /usr/local/bin ]; then
   INSTALL_DIR="/usr/local/bin"
@@ -102,29 +111,28 @@ if [ "$HTTP_CODE" != "200" ]; then
 fi
 
 # --- Verify checksum ---
-info "Verifying checksum..."
-if curl -fsSL -o "${WORK_DIR}/checksums.txt" "$CHECKSUM_URL" 2>/dev/null; then
-  EXPECTED=$(grep -F "${ARTIFACT}" "${WORK_DIR}/checksums.txt" | awk '{print $1}')
-  if [ -n "$EXPECTED" ]; then
-    if command -v sha256sum >/dev/null 2>&1; then
-      ACTUAL=$(sha256sum "${WORK_DIR}/${BINARY_NAME}" | awk '{print $1}')
-    elif command -v shasum >/dev/null 2>&1; then
-      ACTUAL=$(shasum -a 256 "${WORK_DIR}/${BINARY_NAME}" | awk '{print $1}')
-    else
-      warn "No sha256sum or shasum found — cannot verify download integrity"
-      EXPECTED=""
-    fi
-    if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
-      error "Checksum mismatch!\n  Expected: ${EXPECTED}\n  Got:      ${ACTUAL}"
-    fi
-    if [ -n "$EXPECTED" ]; then
-      info "Checksum verified"
-    fi
-  else
-    warn "Artifact not found in checksums.txt, skipping verification"
-  fi
+if [ "$SKIP_CHECKSUM" = "1" ]; then
+  warn "Checksum verification skipped (--skip-checksum)"
 else
-  warn "Could not download checksums.txt, skipping verification"
+  info "Verifying checksum..."
+  if ! curl -fsSL -o "${WORK_DIR}/checksums.txt" "$CHECKSUM_URL" 2>/dev/null; then
+    error "Could not download checksums.txt — cannot verify integrity. Use --skip-checksum to bypass."
+  fi
+  EXPECTED=$(grep -F "${ARTIFACT}" "${WORK_DIR}/checksums.txt" | awk '{print $1}')
+  if [ -z "$EXPECTED" ]; then
+    error "Artifact '${ARTIFACT}' not found in checksums.txt. Use --skip-checksum to bypass."
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL=$(sha256sum "${WORK_DIR}/${BINARY_NAME}" | awk '{print $1}')
+  elif command -v shasum >/dev/null 2>&1; then
+    ACTUAL=$(shasum -a 256 "${WORK_DIR}/${BINARY_NAME}" | awk '{print $1}')
+  else
+    error "No sha256sum or shasum found — cannot verify integrity. Use --skip-checksum to bypass."
+  fi
+  if [ "$EXPECTED" != "$ACTUAL" ]; then
+    error "Checksum mismatch!\n  Expected: ${EXPECTED}\n  Got:      ${ACTUAL}"
+  fi
+  info "Checksum verified"
 fi
 
 # --- Install ---

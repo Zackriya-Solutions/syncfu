@@ -1,3 +1,4 @@
+#Requires -Version 5.1
 param(
     [string]$Version = ""
 )
@@ -22,8 +23,12 @@ if (-not $Version) {
     if (-not $RedirectUrl) {
         $Release = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest"
         $Version = $Release.tag_name -replace '^v', ''
+    } elseif ($RedirectUrl -match '/releases/tag/v([0-9]+\.[0-9]+\.[0-9]+)') {
+        $Version = $Matches[1]
     } else {
-        $Version = ($RedirectUrl -split '/v')[-1]
+        Write-Host "error " -ForegroundColor Red -NoNewline
+        Write-Host "Could not parse version from redirect URL: $RedirectUrl"
+        exit 1
     }
     if (-not $Version) {
         Write-Host "error " -ForegroundColor Red -NoNewline
@@ -33,7 +38,7 @@ if (-not $Version) {
 }
 
 # --- Validate version format ---
-if ($Version -notmatch '^\d+\.\d+\.\d+') {
+if ($Version -notmatch '^\d+\.\d+\.\d+$') {
     Write-Host "error " -ForegroundColor Red -NoNewline
     Write-Host "Unexpected version format: $Version"
     exit 1
@@ -61,7 +66,7 @@ Write-Host "$InstallDir"
 Write-Host ""
 
 # --- Download ---
-$TmpDir = Join-Path $env:TEMP "syncfu-install"
+$TmpDir = Join-Path $env:TEMP "syncfu-install-$([System.IO.Path]::GetRandomFileName())"
 New-Item -ItemType Directory -Force -Path $TmpDir | Out-Null
 $TmpFile = Join-Path $TmpDir $BinaryName
 
@@ -79,10 +84,17 @@ try {
         $ChecksumFile = Join-Path $TmpDir "checksums.txt"
         Invoke-WebRequest -Uri $ChecksumUrl -OutFile $ChecksumFile -UseBasicParsing
 
-        $Expected = ((Get-Content $ChecksumFile | Where-Object { $_ -match $Artifact }) -replace '\s+.*', '').ToLower()
+        $EscapedArtifact = [regex]::Escape($Artifact)
+        $Lines = @(Get-Content $ChecksumFile | Where-Object { $_ -match "^\S+\s+$EscapedArtifact$" })
+        if ($Lines.Count -ne 1) {
+            Write-Host "error " -ForegroundColor Red -NoNewline
+            Write-Host "Expected exactly 1 checksum entry for $Artifact, found $($Lines.Count)"
+            exit 1
+        }
+        $Expected = ($Lines[0] -replace '\s+.*', '').ToLower()
         $Actual = (Get-FileHash -Path $TmpFile -Algorithm SHA256).Hash.ToLower()
 
-        if ($Expected -and ($Expected -ne $Actual)) {
+        if ($Expected -ne $Actual) {
             Write-Host "error " -ForegroundColor Red -NoNewline
             Write-Host "Checksum mismatch! Expected: $Expected, Got: $Actual"
             exit 1
@@ -90,8 +102,9 @@ try {
         Write-Host "info  " -ForegroundColor Green -NoNewline
         Write-Host "Checksum verified"
     } catch {
-        Write-Host "warn  " -ForegroundColor Yellow -NoNewline
-        Write-Host "Could not verify checksum, continuing..."
+        Write-Host "error " -ForegroundColor Red -NoNewline
+        Write-Host "Checksum verification failed: $_"
+        exit 1
     }
 
     # --- Install ---
