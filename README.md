@@ -160,6 +160,18 @@ pnpm tauri build
 
 See [CHEATSHEET.md](CHEATSHEET.md) for a quick-reference of all CLI commands and flags.
 
+### Uninstall
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/uninstall.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/Zackriya-Solutions/syncfu/main/uninstall.ps1 | iex
+```
+
 ---
 
 ## Quick start
