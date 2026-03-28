@@ -7,6 +7,8 @@ dist/
 # Rust / Tauri
 src-tauri/target/
 cli/target/
+netlify.toml
+website/
 
 # Environment
 .env
@@ -27,3 +29,6 @@ target/
 
 # Logs
 *.log
+
+# Local Netlify folder
+.netlify
