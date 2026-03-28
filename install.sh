@@ -137,6 +137,26 @@ if [ "$CLI_ONLY" = "0" ]; then
       fi
 
       info "Installing syncfu.app to /Applications..."
+
+      # Gracefully quit any running syncfu instance before replacing the app bundle.
+      # macOS `open -a` will just activate the existing process otherwise,
+      # leaving the old binary running even after we replace the .app on disk.
+      if pgrep -x syncfu >/dev/null 2>&1; then
+        info "Quitting existing syncfu..."
+        osascript -e 'quit app "syncfu"' 2>/dev/null || true
+        # Wait up to 3 seconds for graceful quit
+        for _i in 1 2 3 4 5 6; do
+          pgrep -x syncfu >/dev/null 2>&1 || break
+          sleep 0.5
+        done
+        # Force-kill only as last resort
+        if pgrep -x syncfu >/dev/null 2>&1; then
+          warn "syncfu did not quit gracefully — force stopping"
+          kill -9 $(pgrep -x syncfu) 2>/dev/null || true
+          sleep 0.5
+        fi
+      fi
+
       MOUNT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/syncfu-dmg.XXXXXXXXXX")
 
       hdiutil attach "$DMG_PATH" -nobrowse -mountpoint "$MOUNT_DIR" -quiet 2>/dev/null
@@ -171,6 +191,21 @@ if [ "$CLI_ONLY" = "0" ]; then
       if [ "$HTTP_CODE" != "200" ]; then
         warn "Desktop app download failed (HTTP ${HTTP_CODE:-???}). Falling back to CLI-only."
         return 1
+      fi
+
+      # Stop any running syncfu instance before replacing the binary
+      if pgrep -x syncfu >/dev/null 2>&1; then
+        info "Stopping existing syncfu process..."
+        pkill -x syncfu 2>/dev/null || true
+        for _i in 1 2 3 4 5 6; do
+          pgrep -x syncfu >/dev/null 2>&1 || break
+          sleep 0.5
+        done
+        if pgrep -x syncfu >/dev/null 2>&1; then
+          warn "syncfu did not exit gracefully — force stopping"
+          pkill -9 -x syncfu 2>/dev/null || true
+          sleep 0.5
+        fi
       fi
 
       APPIMAGE_DIR="$HOME/.local/share/syncfu"
@@ -261,10 +296,16 @@ case ":${PATH:-}:" in
     esac
 
     if [ -n "$RC_FILE" ] && [ -f "$RC_FILE" ]; then
-      printf 'export PATH="%s:$PATH"\n' "$CLI_DIR" >> "$RC_FILE"
-      export PATH="${CLI_DIR}:${PATH}"
-      info "Added ${CLI_DIR} to PATH (${RC_FILE})"
-      printf "\n  ${RED}${BOLD}>>> Open a new terminal window for syncfu to be available. <<<${RESET}\n"
+      # Only append if not already present in the RC file
+      if grep -qF "$CLI_DIR" "$RC_FILE" 2>/dev/null; then
+        info "${CLI_DIR} already in ${RC_FILE} — skipping"
+        export PATH="${CLI_DIR}:${PATH}"
+      else
+        printf 'export PATH="%s:$PATH"\n' "$CLI_DIR" >> "$RC_FILE"
+        export PATH="${CLI_DIR}:${PATH}"
+        info "Added ${CLI_DIR} to PATH (${RC_FILE})"
+        printf "\n  ${RED}${BOLD}>>> Open a new terminal window for syncfu to be available. <<<${RESET}\n"
+      fi
     elif [ "$SHELL_NAME" = "fish" ]; then
       fish -c "fish_add_path $CLI_DIR" 2>/dev/null || true
       export PATH="${CLI_DIR}:${PATH}"
@@ -284,11 +325,24 @@ esac
 # 3. Start desktop app (tray only, no window)
 # =============================================
 if [ "$CLI_ONLY" = "0" ]; then
+  # Wait for port 9868 to be free before launching (old process may still be releasing it)
+  if curl -s "http://127.0.0.1:9868/health" >/dev/null 2>&1; then
+    info "Waiting for port 9868 to be released..."
+    for _i in 1 2 3 4 5 6 7 8 9 10; do
+      curl -s "http://127.0.0.1:9868/health" >/dev/null 2>&1 || break
+      sleep 0.5
+    done
+    if curl -s "http://127.0.0.1:9868/health" >/dev/null 2>&1; then
+      warn "Port 9868 still in use — the new server may fail to start."
+      warn "Try: pkill -x syncfu && sleep 1, then re-run the installer."
+    fi
+  fi
+
   if [ "$OS_NAME" = "darwin" ] && [ -d "/Applications/syncfu.app" ]; then
     info "Starting syncfu (tray + overlay)..."
     open -a "/Applications/syncfu.app"
     # Wait briefly for the server to come up
-    for i in 1 2 3 4 5 6 7 8; do
+    for _i in 1 2 3 4 5 6 7 8; do
       sleep 0.5
       if curl -s "http://127.0.0.1:9868/health" >/dev/null 2>&1; then
         break
