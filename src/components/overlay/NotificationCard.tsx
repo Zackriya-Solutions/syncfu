@@ -91,7 +91,7 @@ export function NotificationCard({
     };
   }, [style, font, index, total, expanded]);
   const [dismissing, setDismissing] = useState(false);
-  const hovering = useRef(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Resolve auto-dismiss duration (null = never)
@@ -104,38 +104,47 @@ export function NotificationCard({
     setTimeout(() => onDismiss(id), DISMISS_ANIM_MS);
   }, [id, onDismiss, dismissing]);
 
-  // Auto-dismiss timer
+  // Auto-dismiss timer — checks if the cursor is actually over the card via
+  // bounding rect + last known cursor position, instead of relying on :hover
+  // or mouseenter (which don't fire reliably when a card mounts under the
+  // cursor in a Tauri NSPanel overlay).
   useEffect(() => {
     if (autoDismissMs === null) return;
 
-    const startTimer = () => {
-      timerRef.current = setTimeout(() => {
-        if (!hovering.current) {
-          animatedDismiss();
-        }
-      }, autoDismissMs);
+    const HOVER_POLL_MS = 200;
+    const cursor = { x: -1, y: -1 };
+    const onMove = (e: MouseEvent) => {
+      cursor.x = e.clientX;
+      cursor.y = e.clientY;
+    };
+    window.addEventListener("mousemove", onMove, { capture: true });
+
+    const isHovered = () => {
+      const el = cardRef.current;
+      if (!el || cursor.x < 0) return false;
+      const r = el.getBoundingClientRect();
+      return (
+        cursor.x >= r.left &&
+        cursor.x <= r.right &&
+        cursor.y >= r.top &&
+        cursor.y <= r.bottom
+      );
     };
 
-    startTimer();
+    const tick = () => {
+      if (isHovered()) {
+        timerRef.current = setTimeout(tick, HOVER_POLL_MS);
+      } else {
+        animatedDismiss();
+      }
+    };
+
+    timerRef.current = setTimeout(tick, autoDismissMs);
     return () => {
+      window.removeEventListener("mousemove", onMove, { capture: true });
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [autoDismissMs, animatedDismiss]);
-
-  const handleMouseEnter = useCallback(() => {
-    hovering.current = true;
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    hovering.current = false;
-    // Restart timer with full duration after hover
-    if (autoDismissMs !== null && !dismissing) {
-      timerRef.current = setTimeout(() => {
-        animatedDismiss();
-      }, autoDismissMs);
-    }
-  }, [autoDismissMs, animatedDismiss, dismissing]);
 
   const classNames = [
     "notification-card",
@@ -148,11 +157,10 @@ export function NotificationCard({
 
   return (
     <div
+      ref={cardRef}
       data-testid="notification-card"
       className={classNames}
       style={styleVars}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       <button
         className="notification-dismiss"

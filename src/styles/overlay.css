@@ -425,10 +425,9 @@
 .notification-card.high .countdown-fill { background: var(--s-countdown-color, var(--accent-high)); opacity: 0.6; }
 .notification-card.critical .countdown-fill { background: var(--s-countdown-color, var(--accent-critical)); opacity: 0.7; }
 
-/* Pause countdown on hover */
-.notification-card:hover .countdown-fill {
-  animation-play-state: paused;
-}
+/* Hover-pause is handled in JS (NotificationCard.tsx) to avoid a stuck-countdown
+ * bug when a notification mounts under the cursor — CSS :hover activates on
+ * mount but mouseenter doesn't fire, leaving the bar paused indefinitely. */
 
 @keyframes countdown-shrink {
   from { transform: scaleX(1); }
